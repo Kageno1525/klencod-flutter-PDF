@@ -1,18 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- صلاحيات التخزين (للأندرويد 12 وأقل) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-
-    <!-- صلاحيات الأندرويد 13+ (للصور والوسائط) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
-
-    <!-- صلاحية الكاميرا (للمسح الضوئي) -->
     <uses-permission android:name="android.permission.CAMERA"/>
-
-    <!-- صلاحية الإنترنت (اختياري - للـ share والتحديثات) -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
@@ -33,17 +26,6 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-
-        <!-- مطلوب لمكتبة flutter_pdfview لعرض PDF -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths"/>
-        </provider>
 
         <meta-data
             android:name="flutterEmbedding"
