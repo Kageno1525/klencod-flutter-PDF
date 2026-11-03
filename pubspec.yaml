@@ -1,4 +1,4 @@
-name: pdf
+name: pdf_vault
 description: A professional PDF vault with nested groups, search, and themes.
 publish_to: 'none'
 version: 1.0.0+1
