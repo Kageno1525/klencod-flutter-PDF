@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pdfx/pdfx.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart';
 
 class PdfViewerScreen extends StatefulWidget {
   final String filePath;
@@ -16,23 +16,10 @@ class PdfViewerScreen extends StatefulWidget {
 }
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
-  late final PdfControllerPinch _controller;
   int _currentPage = 1;
   int _totalPages = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = PdfControllerPinch(
-      document: PdfDocument.openFile(widget.filePath),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  bool _ready = false;
+  PDFViewController? _pdfController;
 
   @override
   Widget build(BuildContext context) {
@@ -56,37 +43,42 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           ),
         ],
       ),
-      body: PdfViewPinch(
-        controller: _controller,
-        onDocumentLoaded: (doc) {
-          setState(() => _totalPages = doc.pagesCount);
-        },
-        onPageChanged: (page) {
-          setState(() => _currentPage = page);
-        },
-        builders: PdfViewPinchBuilders<DefaultBuilderOptions>(
-          options: const DefaultBuilderOptions(),
-          documentLoaderBuilder: (_) =>
-              const Center(child: CircularProgressIndicator()),
-          pageLoaderBuilder: (_) =>
-              const Center(child: CircularProgressIndicator()),
-          errorBuilder: (_, error) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 60, color: Colors.red),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'خطأ في تحميل الملف\n$error',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
+      body: Stack(
+        children: [
+          PDFView(
+            filePath: widget.filePath,
+            enableSwipe: true,
+            swipeHorizontal: false,
+            autoSpacing: true,
+            pageFling: true,
+            pageSnap: true,
+            fitPolicy: FitPolicy.BOTH,
+            onRender: (pages) {
+              setState(() {
+                _totalPages = pages ?? 0;
+                _ready = true;
+              });
+            },
+            onError: (error) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('خطأ في تحميل الملف: $error')),
+                );
+              }
+            },
+            onPageChanged: (page, total) {
+              setState(() {
+                _currentPage = (page ?? 0) + 1;
+                _totalPages = total ?? _totalPages;
+              });
+            },
+            onViewCreated: (controller) {
+              _pdfController = controller;
+            },
           ),
-        ),
+          if (!_ready)
+            const Center(child: CircularProgressIndicator()),
+        ],
       ),
       bottomNavigationBar: Container(
         color: scheme.surfaceContainerHighest,
@@ -97,34 +89,27 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.first_page),
-                onPressed: () => _controller.animateToPage(
-                  pageNumber: 1,
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.ease,
-                ),
+                onPressed: _pdfController != null && _totalPages > 0
+                    ? () => _pdfController!.setPage(0)
+                    : null,
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_left),
-                onPressed: () => _controller.previousPage(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.ease,
-                ),
+                onPressed: _pdfController != null && _currentPage > 1
+                    ? () => _pdfController!.setPage(_currentPage - 2)
+                    : null,
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right),
-                onPressed: () => _controller.nextPage(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.ease,
-                ),
+                onPressed: _pdfController != null &&
+                        _currentPage < _totalPages
+                    ? () => _pdfController!.setPage(_currentPage)
+                    : null,
               ),
               IconButton(
                 icon: const Icon(Icons.last_page),
-                onPressed: _totalPages > 0
-                    ? () => _controller.animateToPage(
-                          pageNumber: _totalPages,
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.ease,
-                        )
+                onPressed: _pdfController != null && _totalPages > 0
+                    ? () => _pdfController!.setPage(_totalPages - 1)
                     : null,
               ),
             ],
