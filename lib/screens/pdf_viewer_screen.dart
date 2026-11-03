@@ -4,12 +4,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 class PdfViewerScreen extends StatefulWidget {
   final String filePath;
   final String fileName;
-
-  const PdfViewerScreen({
-    super.key,
-    required this.filePath,
-    required this.fileName,
-  });
+  const PdfViewerScreen({super.key, required this.filePath, required this.fileName});
 
   @override
   State<PdfViewerScreen> createState() => _PdfViewerScreenState();
@@ -19,6 +14,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   int _currentPage = 1;
   int _totalPages = 0;
   bool _ready = false;
+  bool _horizontal = false;
   PDFViewController? _pdfController;
 
   @override
@@ -26,12 +22,16 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.fileName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: Text(widget.fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
+          IconButton(
+            icon: Icon(_horizontal ? Icons.swap_vert : Icons.swap_horiz),
+            tooltip: _horizontal ? 'عرض عمودي' : 'عرض أفقي',
+            onPressed: () {
+              setState(() => _horizontal = !_horizontal);
+              setState(() {});
+            },
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Center(
@@ -46,9 +46,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       body: Stack(
         children: [
           PDFView(
+            key: ValueKey(_horizontal),
             filePath: widget.filePath,
             enableSwipe: true,
-            swipeHorizontal: false,
+            swipeHorizontal: _horizontal,
             autoSpacing: true,
             pageFling: true,
             pageSnap: true,
@@ -72,12 +73,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 _totalPages = total ?? _totalPages;
               });
             },
-            onViewCreated: (controller) {
-              _pdfController = controller;
-            },
+            onViewCreated: (controller) => _pdfController = controller,
           ),
-          if (!_ready)
-            const Center(child: CircularProgressIndicator()),
+          if (!_ready) const Center(child: CircularProgressIndicator()),
         ],
       ),
       bottomNavigationBar: Container(
@@ -101,8 +99,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right),
-                onPressed: _pdfController != null &&
-                        _currentPage < _totalPages
+                onPressed: _pdfController != null && _currentPage < _totalPages
                     ? () => _pdfController!.setPage(_currentPage)
                     : null,
               ),

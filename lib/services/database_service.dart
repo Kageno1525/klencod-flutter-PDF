@@ -1,10 +1,14 @@
+import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
   DatabaseService._();
 
+  static const String appVersion = '1.0.0';
   Database? _db;
 
   Future<Database> get database async {
@@ -18,7 +22,7 @@ class DatabaseService {
     final path = join(dbPath, 'pdf_vault.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE groups (
@@ -37,16 +41,31 @@ class DatabaseService {
             size INTEGER NOT NULL,
             group_id INTEGER,
             added_at INTEGER NOT NULL,
+            last_opened_at INTEGER,
+            is_favorite INTEGER DEFAULT 0,
+            tag_color INTEGER,
+            tag_label TEXT,
+            auto_category TEXT,
             FOREIGN KEY (group_id) REFERENCES groups (id) ON DELETE CASCADE
           )
         ''');
       },
-      onConfigure: (db) async {
-        await db.execute('PRAGMA foreign_keys = ON');
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          try {
+            await db.execute('ALTER TABLE files ADD COLUMN last_opened_at INTEGER;');
+            await db.execute('ALTER TABLE files ADD COLUMN is_favorite INTEGER DEFAULT 0;');
+            await db.execute('ALTER TABLE files ADD COLUMN tag_color INTEGER;');
+            await db.execute('ALTER TABLE files ADD COLUMN tag_label TEXT;');
+            await db.execute('ALTER TABLE files ADD COLUMN auto_category TEXT;');
+          } catch (_) {}
+        }
       },
+      onConfigure: (db) async => await db.execute('PRAGMA foreign_keys = ON'),
     );
   }
 
+  // ===== Groups =====
   Future<int> insertGroup(String name, {int? parentId}) async {
     final db = await database;
     return db.insert('groups', {
@@ -66,26 +85,18 @@ class DatabaseService {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getAllGroups() async {
-    final db = await database;
-    return db.query('groups', orderBy: 'name ASC');
-  }
-
-  Future<void> updateGroup(int id, String newName) async {
-    final db = await database;
-    await db.update('groups', {'name': newName}, where: 'id = ?', whereArgs: [id]);
-  }
-
   Future<void> deleteGroup(int id) async {
     final db = await database;
     await db.delete('groups', where: 'id = ?', whereArgs: [id]);
   }
 
+  // ===== Files =====
   Future<int> insertFile({
     required String name,
     required String path,
     required int size,
     int? groupId,
+    String? autoCategory,
   }) async {
     final db = await database;
     return db.insert('files', {
@@ -94,16 +105,57 @@ class DatabaseService {
       'size': size,
       'group_id': groupId,
       'added_at': DateTime.now().millisecondsSinceEpoch,
+      'auto_category': autoCategory ?? _guessCategory(name),
     });
   }
 
-  Future<List<Map<String, dynamic>>> getFiles({int? groupId}) async {
+  String _guessCategory(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.contains('invoice') || lower.contains('فاتورة') || lower.contains('receipt')) {
+      return 'فواتير';
+    }
+    if (lower.contains('book') || lower.contains('كتاب') || lower.contains('course') || lower.contains('كورس')) {
+      return 'كتب وكورسات';
+    }
+    if (lower.contains('certificate') || lower.contains('شهادة') || lower.contains('cert')) {
+      return 'شهادات';
+    }
+    if (lower.contains('research') || lower.contains('بحث') || lower.contains('paper')) {
+      return 'بحوث';
+    }
+    return 'عام';
+  }
+
+  Future<List<Map<String, dynamic>>> getFiles({
+    int? groupId,
+    bool favoritesOnly = false,
+    String sortBy = 'added_at DESC',
+  }) async {
+    final db = await database;
+    final where = <String>[];
+    final args = <dynamic>[];
+    if (groupId != null) {
+      where.add('group_id = ?');
+      args.add(groupId);
+    } else {
+      where.add('group_id IS NULL');
+    }
+    if (favoritesOnly) where.add('is_favorite = 1');
+    return db.query(
+      'files',
+      where: where.join(' AND '),
+      whereArgs: args.isEmpty ? null : args,
+      orderBy: sortBy,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getRecentFiles({int limit = 5}) async {
     final db = await database;
     return db.query(
       'files',
-      where: groupId == null ? 'group_id IS NULL' : 'group_id = ?',
-      whereArgs: groupId == null ? null : [groupId],
-      orderBy: 'added_at DESC',
+      where: 'last_opened_at IS NOT NULL',
+      orderBy: 'last_opened_at DESC',
+      limit: limit,
     );
   }
 
@@ -117,13 +169,160 @@ class DatabaseService {
     );
   }
 
+  Future<void> updateFile(int id, Map<String, dynamic> values) async {
+    final db = await database;
+    await db.update('files', values, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> markOpened(int id) async {
+    final db = await database;
+    await db.update(
+      'files',
+      {'last_opened_at': DateTime.now().millisecondsSinceEpoch},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> toggleFavorite(int id, bool isFav) async {
+    final db = await database;
+    await db.update(
+      'files',
+      {'is_favorite': isFav ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<void> deleteFile(int id) async {
     final db = await database;
     await db.delete('files', where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<void> moveFile(int fileId, int? newGroupId) async {
+  // ===== Backup & Restore =====
+
+  Future<Directory> getBackupDirectory() async {
+    try {
+      final downloads = await getDownloadsDirectory();
+      if (downloads != null) {
+        final dir = Directory('${downloads.path}/PdfVault');
+        if (!await dir.exists()) await dir.create(recursive: true);
+        return dir;
+      }
+    } catch (_) {}
+
+    try {
+      final ext = await getExternalStorageDirectory();
+      if (ext != null) {
+        final dir = Directory('${ext.path}/PdfVaultBackups');
+        if (!await dir.exists()) await dir.create(recursive: true);
+        return dir;
+      }
+    } catch (_) {}
+
+    final docs = await getApplicationDocumentsDirectory();
+    final dir = Directory('${docs.path}/PdfVaultBackups');
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return dir;
+  }
+
+  Future<File> exportDatabaseBackup() async {
     final db = await database;
-    await db.update('files', {'group_id': newGroupId}, where: 'id = ?', whereArgs: [fileId]);
+    await db.close();
+    _db = null;
+
+    try {
+      final dbPath = await getDatabasesPath();
+      final sourceFile = File(join(dbPath, 'pdf_vault.db'));
+      if (!await sourceFile.exists()) {
+        await database;
+        throw Exception('قاعدة البيانات غير موجودة');
+      }
+
+      final backupDir = await getBackupDirectory();
+      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final backupFile = File(
+        join(backupDir.path, 'pdf_vault_v${appVersion}_$timestamp.db'),
+      );
+
+      await sourceFile.copy(backupFile.path);
+      await database;
+      return backupFile;
+    } catch (e) {
+      await database;
+      rethrow;
+    }
+  }
+
+  Future<File> exportFullBackup() async {
+    final db = await database;
+    await db.close();
+    _db = null;
+
+    try {
+      final backupDir = await getBackupDirectory();
+      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final zipPath = join(
+          backupDir.path, 'PdfVaultBackup_v${appVersion}_$timestamp.zip');
+
+      final tempDir = await getTemporaryDirectory();
+      final stagingDir =
+          Directory('${tempDir.path}/backup_staging_$timestamp');
+      if (!await stagingDir.exists()) await stagingDir.create(recursive: true);
+
+      final dbPath = await getDatabasesPath();
+      await File(join(dbPath, 'pdf_vault.db'))
+          .copy('${stagingDir.path}/pdf_vault.db');
+
+      final appDir = await getApplicationDocumentsDirectory();
+      final pdfDir = Directory('${appDir.path}/pdfs');
+      if (await pdfDir.exists()) {
+        final filesDir = Directory('${stagingDir.path}/pdfs');
+        await filesDir.create(recursive: true);
+        await for (final entity in pdfDir.list()) {
+          if (entity is File) {
+            await entity.copy(
+                '${filesDir.path}/${entity.uri.pathSegments.last}');
+          }
+        }
+      }
+
+      await database;
+
+      final result = await Process.run(
+        'zip',
+        ['-r', zipPath, '.'], // best effort; may not be available
+        workingDirectory: stagingDir.path,
+      );
+      if (result.exitCode != 0) {
+        throw Exception('فشل إنشاء ملف ZIP');
+      }
+      return File(zipPath);
+    } catch (e) {
+      await database;
+      rethrow;
+    }
+  }
+
+  Future<void> restoreDatabaseFromBackup(String backupPath) async {
+    final db = await database;
+    await db.close();
+    _db = null;
+
+    try {
+      final dbPath = await getDatabasesPath();
+      final currentDb = File(join(dbPath, 'pdf_vault.db'));
+
+      if (await currentDb.exists()) {
+        final ts = DateTime.now().millisecondsSinceEpoch;
+        await currentDb.copy('${currentDb.path}.safety_$ts');
+      }
+
+      await File(backupPath).copy(currentDb.path);
+      await database;
+    } catch (e) {
+      await database;
+      rethrow;
+    }
   }
 }

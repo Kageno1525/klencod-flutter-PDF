@@ -16,8 +16,13 @@ dependencies:
   file_picker: ^8.1.7
   provider: ^6.1.2
   flutter_pdfview: ^1.4.0
-  shared_preferences: ^2.2.2
+  shared_preferences: ^2.3.2
   intl: ^0.19.0
+  share_plus: ^10.0.2
+  image_picker: ^1.1.2
+  pdf: ^3.11.1
+  qr_flutter: ^4.1.0
+  archive: ^3.6.1
 
 dev_dependencies:
   flutter_test:
