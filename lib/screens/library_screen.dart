@@ -45,8 +45,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Future<void> _load() async {
     if (_docs.isEmpty) setState(() => _loading = true);
-    final docs =
-        await DatabaseService.instance.getAll(search: _query, sort: _sort, filter: _filter);
+    final docs = await DatabaseService.instance
+        .getAll(search: _query, sort: _sort, filter: _filter);
     final stats = await DatabaseService.instance.getStats();
     if (!mounted) return;
     setState(() {
@@ -144,13 +144,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
       SnackBar(
         content: Row(children: [
           if (success)
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            const Icon(Icons.check_circle_rounded,
+                color: Colors.white, size: 20),
           if (success) const SizedBox(width: 8),
           Expanded(child: Text(msg)),
         ]),
         behavior: SnackBarBehavior.floating,
         backgroundColor: success ? Colors.green.shade700 : null,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -181,9 +183,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ),
             ),
             ListTile(
-              leading: Icon(doc.isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
+              leading: Icon(
+                  doc.isFavorite
+                      ? Icons.star_rounded
+                      : Icons.star_border_rounded,
                   color: Colors.amber),
-              title: Text(doc.isFavorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة'),
+              title:
+                  Text(doc.isFavorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة'),
               onTap: () {
                 Navigator.pop(context);
                 _toggleFav(doc);
@@ -198,7 +204,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              leading:
+                  const Icon(Icons.delete_outline_rounded, color: Colors.red),
               title: const Text('حذف', style: TextStyle(color: Colors.red)),
               onTap: () {
                 Navigator.pop(context);
@@ -232,7 +239,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
             const Padding(
               padding: EdgeInsets.all(16),
               child: Text('ترتيب حسب',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  style:
+                      TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             ),
             for (final s in SortOption.values)
               RadioListTile<SortOption>(
@@ -269,7 +277,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   String _fmtSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024)
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
     if (bytes < 1024 * 1024 * 1024) {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
@@ -277,8 +286,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   String _relDate(int ts) {
-    final d = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(ts));
-    if (d.inDays >= 30) return DateFormat('d MMM yyyy', 'ar').format(DateTime.fromMillisecondsSinceEpoch(ts));
+    final d =
+        DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(ts));
+    if (d.inDays >= 30) {
+      return DateFormat('d MMM yyyy')
+          .format(DateTime.fromMillisecondsSinceEpoch(ts));
+    }
     if (d.inDays > 0) return 'منذ ${d.inDays} يوم';
     if (d.inHours > 0) return 'منذ ${d.inHours} ساعة';
     if (d.inMinutes > 0) return 'منذ ${d.inMinutes} دقيقة';
@@ -313,22 +326,22 @@ class _LibraryScreenState extends State<LibraryScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('مستودعي',
-                  style: theme.textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.8)),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800, letterSpacing: -0.8)),
               Text('${_stats['count']} ملف في المكتبة',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant)),
             ],
           ),
           const Spacer(),
           _CircleIconButton(
             icon: isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
             onTap: _toggleTheme,
-            isDark: isDark,
           ),
           const SizedBox(width: 4),
           _CircleIconButton(
-            icon: _isGrid ? Icons.view_agenda_rounded : Icons.grid_view_rounded,
+            icon:
+                _isGrid ? Icons.view_agenda_rounded : Icons.grid_view_rounded,
             onTap: () => setState(() => _isGrid = !_isGrid),
           ),
         ],
@@ -345,8 +358,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              theme.colorScheme.primaryContainer.withValues(alpha: 0.55),
-              theme.colorScheme.tertiaryContainer.withValues(alpha: 0.35),
+              theme.colorScheme.primaryContainer.withOpacity(0.55),
+              theme.colorScheme.tertiaryContainer.withOpacity(0.35),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -359,12 +372,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
             _divider(),
             _statItem(Icons.menu_book_rounded, '${_stats['pages']}', 'صفحة'),
             _divider(),
-            _statItem(
-                Icons.storage_rounded, _fmtSize(_stats['size'] ?? 0), 'حجم'),
+            _statItem(Icons.storage_rounded, _fmtSize(_stats['size'] ?? 0),
+                'حجم'),
           ],
         ),
       ),
-    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.15, end: 0, curve: Curves.easeOutCubic);
+    )
+        .animate()
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: 0.15, end: 0, curve: Curves.easeOutCubic);
   }
 
   Widget _statItem(IconData icon, String value, String label) {
@@ -388,7 +404,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget _divider() => Container(
         width: 1,
         height: 40,
-        color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+        color: Theme.of(context).dividerColor.withOpacity(0.3),
       );
 
   Widget _buildFilters() {
@@ -415,7 +431,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     ),
               filled: true,
               fillColor: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.6),
+                  .withOpacity(0.6),
               contentPadding: EdgeInsets.zero,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -431,11 +447,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _filterChip(FilterOption.all, 'الكل', Icons.library_books_rounded),
+                      _filterChip(FilterOption.all, 'الكل',
+                          Icons.library_books_rounded),
                       const SizedBox(width: 8),
-                      _filterChip(FilterOption.favorites, 'المفضلة', Icons.star_rounded),
+                      _filterChip(FilterOption.favorites, 'المفضلة',
+                          Icons.star_rounded),
                       const SizedBox(width: 8),
-                      _filterChip(FilterOption.recent, 'حديثة', Icons.access_time_rounded),
+                      _filterChip(FilterOption.recent, 'حديثة',
+                          Icons.access_time_rounded),
                     ],
                   ),
                 ),
@@ -443,7 +462,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               const SizedBox(width: 8),
               Material(
                 color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.6),
+                    .withOpacity(0.6),
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
@@ -477,7 +496,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         decoration: BoxDecoration(
           color: selected
               ? theme.colorScheme.primary
-              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+              : theme.colorScheme.surfaceContainerHighest.withOpacity(0.6),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -556,9 +575,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
           children: [
             Icon(Icons.folder_open_rounded,
                     size: 88,
-                    color: theme.colorScheme.primary.withValues(alpha: 0.7))
+                    color: theme.colorScheme.primary.withOpacity(0.7))
                 .animate(onPlay: (c) => c.repeat(reverse: true))
-                .moveY(begin: -8, end: 8, duration: 1600.ms, curve: Curves.easeInOut),
+                .moveY(
+                    begin: -8,
+                    end: 8,
+                    duration: 1600.ms,
+                    curve: Curves.easeInOut),
             const SizedBox(height: 20),
             Text('المكتبة فاضية',
                     style: theme.textTheme.titleLarge
@@ -568,8 +591,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 .slideY(begin: 0.3),
             const SizedBox(height: 8),
             Text('ابدأ باستيراد ملفات PDF',
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant))
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant))
                 .animate()
                 .fadeIn(delay: 350.ms),
             const SizedBox(height: 24),
@@ -621,7 +644,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
         return Dismissible(
           key: ValueKey(doc.id),
           direction: DismissDirection.endToStart,
-          confirmDismiss: (_) => _confirm('حذف "${doc.title}"؟', 'لا يمكن التراجع'),
+          confirmDismiss: (_) =>
+              _confirm('حذف "${doc.title}"؟', 'لا يمكن التراجع'),
           onDismissed: (_) async {
             await DatabaseService.instance.delete(doc.id!);
             if (doc.thumbPath != null) {
@@ -672,30 +696,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
           : const Icon(Icons.add_rounded),
       label: Text(_importing ? 'جاري...' : 'إضافة PDF',
           style: const TextStyle(fontWeight: FontWeight.w700)),
-    ).animate(target: _importing ? 0 : 1).shimmer(
-        duration: 2000.ms,
-        color: Colors.white.withValues(alpha: 0.3),
-        delay: 800.ms);
+    );
   }
 }
-
-// ============ Widgets مساعدة ============
 
 class _CircleIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  final bool isDark;
-  const _CircleIconButton({
-    required this.icon,
-    required this.onTap,
-    this.isDark = false,
-  });
+  const _CircleIconButton({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+      color:
+          theme.colorScheme.surfaceContainerHighest.withOpacity(0.6),
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
@@ -747,8 +762,8 @@ class _PdfThumb extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            theme.colorScheme.errorContainer.withValues(alpha: 0.65),
-            theme.colorScheme.errorContainer.withValues(alpha: 0.25),
+            theme.colorScheme.errorContainer.withOpacity(0.65),
+            theme.colorScheme.errorContainer.withOpacity(0.25),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -807,7 +822,8 @@ class _GridCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final progress = doc.pageCount > 0 ? doc.lastPage / doc.pageCount : 0.0;
+    final progress =
+        doc.pageCount > 0 ? doc.lastPage / doc.pageCount : 0.0;
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(16),
@@ -889,7 +905,8 @@ class _ListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final progress = doc.pageCount > 0 ? doc.lastPage / doc.pageCount : 0.0;
+    final progress =
+        doc.pageCount > 0 ? doc.lastPage / doc.pageCount : 0.0;
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(16),
@@ -952,12 +969,13 @@ class _FavButton extends StatelessWidget {
   final bool isFav;
   final VoidCallback onTap;
   final bool mini;
-  const _FavButton({required this.isFav, required this.onTap, this.mini = false});
+  const _FavButton(
+      {required this.isFav, required this.onTap, this.mini = false});
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: mini ? Colors.transparent : Colors.black.withValues(alpha: 0.35),
+      color: mini ? Colors.transparent : Colors.black.withOpacity(0.35),
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),

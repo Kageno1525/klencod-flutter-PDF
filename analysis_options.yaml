@@ -1,0 +1,18 @@
+analyzer:
+  errors:
+    deprecated_member_use: ignore
+    deprecated_member_use_from_same_package: ignore
+    unused_import: ignore
+    unused_field: ignore
+    unused_element: ignore
+    unused_local_variable: ignore
+    dead_code: info
+    invalid_use_of_protected_member: ignore
+
+linter:
+  rules:
+    prefer_const_constructors: true
+    prefer_const_literals_to_create_immutables: true
+    avoid_print: false
+    use_key_in_widget_constructors: true
+    prefer_single_quotes: true

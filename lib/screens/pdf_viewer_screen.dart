@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:pdfrx/pdfrx.dart';
 import '../service/database_service.dart';
 
@@ -59,7 +58,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء')),
           FilledButton(
             onPressed: () {
               final n = int.tryParse(ctrl.text);
@@ -94,34 +94,30 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     final theme = Theme.of(context);
     final progress = _totalPages > 0 ? _currentPage / _totalPages : 0.0;
 
-    return PopScope(
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) await _saveProgress();
-      },
-      child: Scaffold(
-        body: SafeArea(
-          child: Column(
-            children: [
-              _buildAppBar(theme, progress),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _showToolbar = !_showToolbar),
-                  child: PdfViewer.file(
-                    widget.doc.filePath,
-                    controller: _controller,
-                    initialPageNumber: _lastSaved > 0 ? _lastSaved : 1,
-                    params: PdfViewerParams(
-                      onPageChanged: (page) {
-                        setState(() => _currentPage = page);
-                        _saveProgress();
-                      },
-                    ),
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildAppBar(theme, progress),
+            Expanded(
+              child: GestureDetector(
+                onTap: () =>
+                    setState(() => _showToolbar = !_showToolbar),
+                child: PdfViewer.file(
+                  widget.doc.filePath,
+                  controller: _controller,
+                  initialPageNumber: _lastSaved > 0 ? _lastSaved : 1,
+                  params: PdfViewerParams(
+                    onPageChanged: (page) {
+                      setState(() => _currentPage = page);
+                      _saveProgress();
+                    },
                   ),
                 ),
               ),
-              _buildBottomBar(theme),
-            ],
-          ),
+            ),
+            _buildBottomBar(theme),
+          ],
         ),
       ),
     );
@@ -136,7 +132,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () => Navigator.pop(context),
+                onPressed: () async {
+                  await _saveProgress();
+                  if (mounted) Navigator.pop(context);
+                },
               ),
               Expanded(
                 child: Column(
@@ -185,7 +184,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 builder: (_, v, __) => LinearProgressIndicator(
                   value: v,
                   minHeight: 4,
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  backgroundColor:
+                      theme.colorScheme.surfaceContainerHighest,
                 ),
               ),
             ),
@@ -208,7 +208,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             color: theme.colorScheme.surface,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
+                color: Colors.black.withOpacity(0.08),
                 blurRadius: 20,
                 offset: const Offset(0, -4),
               ),
@@ -217,12 +217,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _navBtn(Icons.chevron_right_rounded, _prev, _currentPage > 1),
+              _navBtn(
+                  Icons.chevron_right_rounded, _prev, _currentPage > 1),
               GestureDetector(
                 onTap: _jumpToPage,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(20),
