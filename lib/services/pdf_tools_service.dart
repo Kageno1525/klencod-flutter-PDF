@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:sqflite/sqflite.dart'; // ← الإضافة الجديدة
 import 'database_service.dart';
 
 class PdfToolsService {
@@ -28,7 +29,6 @@ class PdfToolsService {
     return p.join(dir.path, '${ts}_$suffix.$ext');
   }
 
-  // ===== Share =====
   Future<void> shareFile(String path, String name) async {
     await Share.shareXFiles(
       [XFile(path, name: name)],
@@ -42,7 +42,6 @@ class PdfToolsService {
     await Share.shareXFiles([XFile(path, name: name)], subject: name);
   }
 
-  // ===== Images to PDF =====
   Future<String> imagesToPdf(
     List<XFile> images, {
     String baseName = 'images',
@@ -68,7 +67,6 @@ class PdfToolsService {
     return outPath;
   }
 
-  // ===== Simple scan from camera =====
   Future<String?> scanFromCamera() async {
     final picker = ImagePicker();
     final photo = await picker.pickImage(
@@ -79,7 +77,6 @@ class PdfToolsService {
     return imagesToPdf([photo], baseName: 'scan');
   }
 
-  // ===== Import images to PDF and register in DB =====
   Future<int?> importImagesAsPdf(BuildContext context, {int? groupId}) async {
     final picker = ImagePicker();
     final images = await picker.pickMultiImage();
@@ -97,7 +94,6 @@ class PdfToolsService {
     );
   }
 
-  // ===== Full backup as ZIP (using archive package) =====
   Future<File> exportFullBackup() async {
     final backupDir = await _db.getBackupDirectory();
     final ts = DateTime.now().millisecondsSinceEpoch;
@@ -126,7 +122,6 @@ class PdfToolsService {
     return File(zipPath);
   }
 
-  // ===== Restore from ZIP =====
   Future<void> restoreFullBackup(String zipPath) async {
     final bytes = await File(zipPath).readAsBytes();
     final archive = ZipDecoder().decodeBytes(bytes);

@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart'; // ← الإضافة الجديدة
 import '../main.dart';
 import '../services/database_service.dart';
 import '../services/pdf_tools_service.dart';
@@ -128,10 +129,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const Text(
-                'أدوات إضافية',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              const Text('أدوات إضافية',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               _toolTile(
                 icon: Icons.image,
@@ -313,7 +312,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   file['is_favorite'] == 1 ? Icons.star : Icons.star_border,
                   color: Colors.amber,
                 ),
-                title: Text(file['is_favorite'] == 1 ? 'إزالة من المفضلة' : 'إضافة للمفضلة'),
+                title: Text(file['is_favorite'] == 1
+                    ? 'إزالة من المفضلة'
+                    : 'إضافة للمفضلة'),
                 onTap: () async {
                   await _db.toggleFavorite(file['id'], file['is_favorite'] != 1);
                   if (mounted) Navigator.pop(context);
@@ -619,7 +620,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                         child: Column(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
-                                            const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 32),
+                                            const Icon(Icons.picture_as_pdf,
+                                                color: Colors.redAccent, size: 32),
                                             const SizedBox(height: 4),
                                             Text(f['name'],
                                                 maxLines: 1,
