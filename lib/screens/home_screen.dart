@@ -168,6 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
           style:
               const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
       actions: [
+        const ViewModeToggle(),
         ThemeToggleButton(isDark: tp.isDark, onTap: tp.toggleTheme),
         const SizedBox(width: 8),
       ],
@@ -335,8 +336,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontSize: 20,
                               fontWeight: FontWeight.bold)),
                       Text('مستودع ملفاتك',
-                          style: TextStyle(
-                              color: Colors.white70, fontSize: 12)),
+                          style:
+                              TextStyle(color: Colors.white70, fontSize: 12)),
                     ],
                   ),
                 ],
@@ -511,10 +512,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (saveResult == null) return;
 
     try {
-      final path = await _tools.imagesToPdf(
-        images,
-        baseName: saveResult.name,
-      );
+      final path =
+          await _tools.imagesToPdf(images, baseName: saveResult.name);
       final stat = await File(path).stat();
       await _db.insertFile(
         name: saveResult.name,
@@ -635,8 +634,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('جاري الدمج...')),
       );
-      final file =
-          await _tools.mergePdfs(paths, baseName: saveResult.name);
+      final file = await _tools.mergePdfs(paths, baseName: saveResult.name);
       final stat = await file.stat();
       await _db.insertFile(
         name: saveResult.name,
@@ -885,7 +883,7 @@ class _SplitDialogState extends State<_SplitDialog> {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// HOME TAB (GRID + ZOOM)
+// HOME TAB — يدعم 4 أشكال عرض
 // ═══════════════════════════════════════════════════════════════════
 
 class HomeTab extends StatefulWidget {
@@ -948,93 +946,69 @@ class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     return AppBackground(
-      child: ValueListenableBuilder<double>(
-        valueListenable: gridSizeNotifier,
-        builder: (_, gridSize, __) {
-          return PinchZoomWrapper(
-            child: RefreshIndicator(
-              onRefresh: _load,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics()),
-                slivers: [
-                  SliverToBoxAdapter(child: _buildSearch()),
-                  SliverToBoxAdapter(child: _buildSortChips()),
-                  if (_files.isNotEmpty) ...[
-                    SliverToBoxAdapter(
-                      child: SectionHeader(
-                        icon: Icons.picture_as_pdf_rounded,
-                        title:
-                            _search.isEmpty ? 'كل الملفات' : 'نتائج البحث',
-                        color: const Color(0xFFDC2626),
-                        trailing: '${_files.length}',
-                      ),
+      child: ValueListenableBuilder<ViewMode>(
+        valueListenable: viewModeNotifier,
+        builder: (_, mode, __) {
+          return RefreshIndicator(
+            onRefresh: _load,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics()),
+              slivers: [
+                SliverToBoxAdapter(child: _buildSearch()),
+                SliverToBoxAdapter(child: _buildSortChips()),
+                if (_files.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: SectionHeader(
+                      icon: Icons.picture_as_pdf_rounded,
+                      title: _search.isEmpty ? 'كل الملفات' : 'نتائج البحث',
+                      color: const Color(0xFFDC2626),
+                      trailing: '${_files.length}',
                     ),
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: gridSize,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio: 0.82,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (ctx, i) {
-                            final f = _files[i];
-                            final isSel =
-                                widget.selectedFiles.containsKey(f['id']);
-                            return RepaintBoundary(
-                              child: FileGridItem(
-                                file: f,
-                                isSelected: isSel,
-                                inSelectionMode: _inSelectionMode,
-                                onTap: () {
-                                  if (_inSelectionMode) {
-                                    widget.onToggleSelection(f);
-                                  } else {
-                                    _openFile(f);
-                                  }
-                                },
-                                onLongPress: () {
-                                  if (!_inSelectionMode) {
-                                    widget.onEnterSelection(f);
-                                  } else {
-                                    widget.onToggleSelection(f);
-                                  }
-                                },
-                              ),
-                            );
-                          },
-                          childCount: _files.length,
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (_loading)
-                    const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                    ),
-                  if (!_loading && _files.isEmpty)
-                    SliverToBoxAdapter(
-                      child: EmptyState(
-                        icon: Icons.picture_as_pdf_outlined,
-                        title: _search.isEmpty
-                            ? 'لا توجد ملفات بعد'
-                            : 'لا توجد نتائج',
-                        subtitle: _search.isEmpty
-                            ? 'اضغط زر + لاستيراد ملف PDF'
-                            : 'جرّب كلمة بحث أخرى',
-                        color: const Color(0xFFDC2626),
-                      ),
-                    ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                  ),
+                  filesSliver(
+                    files: _files,
+                    mode: mode,
+                    selectedFiles: widget.selectedFiles,
+                    inSelectionMode: _inSelectionMode,
+                    onTap: (f) {
+                      if (_inSelectionMode) {
+                        widget.onToggleSelection(f);
+                      } else {
+                        _openFile(f);
+                      }
+                    },
+                    onLongPress: (f) {
+                      if (!_inSelectionMode) {
+                        widget.onEnterSelection(f);
+                      } else {
+                        widget.onToggleSelection(f);
+                      }
+                    },
+                  ),
                 ],
-              ),
+                if (_loading)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+                if (!_loading && _files.isEmpty)
+                  SliverToBoxAdapter(
+                    child: EmptyState(
+                      icon: Icons.picture_as_pdf_outlined,
+                      title: _search.isEmpty
+                          ? 'لا توجد ملفات بعد'
+                          : 'لا توجد نتائج',
+                      subtitle: _search.isEmpty
+                          ? 'اضغط زر + لاستيراد ملف PDF'
+                          : 'جرّب كلمة بحث أخرى',
+                      color: const Color(0xFFDC2626),
+                    ),
+                  ),
+                const SliverToBoxAdapter(child: SizedBox(height: 120)),
+              ],
             ),
           );
         },

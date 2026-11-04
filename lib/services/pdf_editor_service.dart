@@ -13,7 +13,7 @@ enum PdfEditType { cover, text }
 class PdfEdit {
   final PdfEditType type;
   final int pageIndex;
-  final Rect normalizedBounds; // 0-1 range
+  final Rect normalizedBounds;
   final String? text;
   final Color? color;
   final double fontSize;
@@ -35,7 +35,6 @@ class PdfEditorService {
   static const int previewDpi = 150;
   static const int outputDpi = 200;
 
-  /// Render pages for preview
   Future<List<Uint8List>> renderPagesForPreview(File file) async {
     return _renderPages(file, previewDpi);
   }
@@ -49,7 +48,6 @@ class PdfEditorService {
     return images;
   }
 
-  /// Get image dimensions (for aspect ratio)
   Size getImageSize(Uint8List pngBytes) {
     try {
       final decoded = img.decodeImage(pngBytes);
@@ -57,21 +55,18 @@ class PdfEditorService {
         return Size(decoded.width.toDouble(), decoded.height.toDouble());
       }
     } catch (_) {}
-    return const Size(595, 842); // A4 fallback
+    return const Size(595, 842);
   }
 
-  /// Apply all edits and produce a new PDF
   Future<File> applyEdits(
     String sourcePath,
     List<PdfEdit> edits, {
     String baseName = 'edited',
   }) async {
-    // Render at high quality for output
     final pageImages = await _renderPages(File(sourcePath), outputDpi);
 
     final doc = pw.Document();
 
-    // Load fonts
     pw.Font? cairoFont;
     try {
       cairoFont = await PdfGoogleFonts.cairoRegular();
@@ -111,16 +106,13 @@ class PdfEditorService {
                   child: pw.Container(
                     width: width,
                     height: height,
-                    color: pw.PdfColor.fromInt(
-                      edit.color?.value ?? 0xFFFFFFFF,
-                    ),
+                    color: PdfColor.fromInt(edit.color?.value ?? 0xFFFFFFFF),
                   ),
                 );
               } else {
                 final text = edit.text ?? '';
-                final hasArabic = text.runes.any(
-                  (r) => r >= 0x0600 && r <= 0x06FF,
-                );
+                final hasArabic =
+                    text.runes.any((r) => r >= 0x0600 && r <= 0x06FF);
                 final font =
                     hasArabic ? (cairoFont ?? helveticaFont) : helveticaFont;
 
@@ -132,9 +124,8 @@ class PdfEditorService {
                     style: pw.TextStyle(
                       font: font,
                       fontSize: edit.fontSize,
-                      color: pw.PdfColor.fromInt(
-                        edit.color?.value ?? 0xFF000000,
-                      ),
+                      color:
+                          PdfColor.fromInt(edit.color?.value ?? 0xFF000000),
                     ),
                   ),
                 );

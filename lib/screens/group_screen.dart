@@ -160,10 +160,11 @@ class _GroupScreenState extends State<GroupScreen> {
       await File(f.path!).copy(dest);
       final stat = await File(dest).stat();
       await _db.insertFile(
-          name: f.name,
-          path: dest,
-          size: stat.size,
-          groupId: widget.groupId);
+        name: f.name,
+        path: dest,
+        size: stat.size,
+        groupId: widget.groupId,
+      );
     }
     _load();
   }
@@ -177,101 +178,164 @@ class _GroupScreenState extends State<GroupScreen> {
         child: SafeArea(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      if (_groups.isNotEmpty) ...[
-                        Row(
-                          children: [
-                            Icon(Icons.folder_rounded,
-                                color: Colors.amber[700], size: 18),
-                            const SizedBox(width: 6),
-                            const Text('المجلدات',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14)),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text('${_groups.length}',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 11,
-                                      color: Colors.amber[800])),
-                            ),
-                          ],
+              : ValueListenableBuilder<ViewMode>(
+                  valueListenable: viewModeNotifier,
+                  builder: (_, mode, __) {
+                    return RefreshIndicator(
+                      onRefresh: _load,
+                      child: CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
                         ),
-                        const SizedBox(height: 10),
-                        ..._groups.map((g) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: GroupTile(
-                                group: g,
-                                onTap: () async {
-                                  await Navigator.push(
-                                    context,
-                                    pageRoute(GroupScreen(
-                                      groupId: g['id'],
-                                      groupName: g['name'],
-                                    )),
-                                  );
-                                  _load();
-                                },
-                                onLongPress: () => _showGroupOptions(g),
+                        slivers: [
+                          if (_groups.isNotEmpty) ...[
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.folder_rounded,
+                                        color: Colors.amber[700], size: 18),
+                                    const SizedBox(width: 6),
+                                    const Text('المجلدات',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14)),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withOpacity(0.15),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                      ),
+                                      child: Text('${_groups.length}',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 11,
+                                              color: Colors.amber[800])),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            )),
-                        const SizedBox(height: 16),
-                      ],
-                      if (_files.isNotEmpty) ...[
-                        Row(
-                          children: [
-                            const Icon(Icons.picture_as_pdf_rounded,
-                                color: Color(0xFFDC2626), size: 18),
-                            const SizedBox(width: 6),
-                            const Text('الملفات',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14)),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color:
-                                    const Color(0xFFDC2626).withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text('${_files.length}',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 11,
-                                      color: Color(0xFFDC2626))),
                             ),
+                            SliverPadding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              sliver: isGridMode(mode)
+                                  ? SliverGrid(
+                                      gridDelegate:
+                                          gridDelegateForMode(mode),
+                                      delegate: SliverChildBuilderDelegate(
+                                        (ctx, i) {
+                                          final g = _groups[i];
+                                          return RepaintBoundary(
+                                            child: folderTileForMode(
+                                              context: ctx,
+                                              folder: g,
+                                              mode: mode,
+                                              onTap: () async {
+                                                await Navigator.push(
+                                                  context,
+                                                  pageRoute(GroupScreen(
+                                                    groupId: g['id'],
+                                                    groupName: g['name'],
+                                                  )),
+                                                );
+                                                _load();
+                                              },
+                                              onLongPress: () =>
+                                                  _showGroupOptions(g),
+                                            ),
+                                          );
+                                        },
+                                        childCount: _groups.length,
+                                      ),
+                                    )
+                                  : SliverList.builder(
+                                      itemCount: _groups.length,
+                                      itemBuilder: (ctx, i) {
+                                        final g = _groups[i];
+                                        return Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 8),
+                                          child: RepaintBoundary(
+                                            child: folderTileForMode(
+                                              context: ctx,
+                                              folder: g,
+                                              mode: mode,
+                                              onTap: () async {
+                                                await Navigator.push(
+                                                  context,
+                                                  pageRoute(GroupScreen(
+                                                    groupId: g['id'],
+                                                    groupName: g['name'],
+                                                  )),
+                                                );
+                                                _load();
+                                              },
+                                              onLongPress: () =>
+                                                  _showGroupOptions(g),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                            ),
+                            const SliverToBoxAdapter(
+                                child: SizedBox(height: 20)),
                           ],
-                        ),
-                        const SizedBox(height: 10),
-                        ..._files.map((f) {
-                          final isSel = _selected.containsKey(f['id']);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: FileTile(
-                              file: f,
-                              isSelected: isSel,
+                          if (_files.isNotEmpty) ...[
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                        Icons.picture_as_pdf_rounded,
+                                        color: Color(0xFFDC2626),
+                                        size: 18),
+                                    const SizedBox(width: 6),
+                                    const Text('الملفات',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14)),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDC2626)
+                                            .withOpacity(0.15),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                      ),
+                                      child: Text('${_files.length}',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 11,
+                                              color: Color(0xFFDC2626))),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            filesSliver(
+                              files: _files,
+                              mode: mode,
+                              selectedFiles: _selected,
                               inSelectionMode: _inSelectionMode,
-                              onTap: () {
+                              onTap: (f) {
                                 if (_inSelectionMode) {
                                   _toggleSelection(f);
                                 } else {
                                   _openFile(f);
                                 }
                               },
-                              onLongPress: () {
+                              onLongPress: (f) {
                                 if (!_inSelectionMode) {
                                   _enterSelection(f);
                                 } else {
@@ -279,22 +343,26 @@ class _GroupScreenState extends State<GroupScreen> {
                                 }
                               },
                             ),
-                          );
-                        }),
-                      ],
-                      if (_groups.isEmpty && _files.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 80),
-                          child: EmptyState(
-                            icon: Icons.folder_open_rounded,
-                            title: 'هذا القسم فارغ',
-                            subtitle: 'اضغط زر + لإضافة مجلد أو ارفع PDF',
-                            color: Color(0xFFF59E0B),
-                          ),
-                        ),
-                      const SizedBox(height: 160),
-                    ],
-                  ),
+                          ],
+                          if (_groups.isEmpty && _files.isEmpty)
+                            const SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.only(top: 80),
+                                child: EmptyState(
+                                  icon: Icons.folder_open_rounded,
+                                  title: 'هذا القسم فارغ',
+                                  subtitle:
+                                      'اضغط زر + لإضافة مجلد أو ارفع PDF',
+                                  color: Color(0xFFF59E0B),
+                                ),
+                              ),
+                            ),
+                          const SliverToBoxAdapter(
+                              child: SizedBox(height: 160)),
+                        ],
+                      ),
+                    );
+                  },
                 ),
         ),
       ),
@@ -314,6 +382,7 @@ class _GroupScreenState extends State<GroupScreen> {
       elevation: 0,
       title: Text(widget.groupName),
       actions: [
+        const ViewModeToggle(),
         IconButton(
             icon: const Icon(Icons.upload_file), onPressed: _importPdfs),
       ],

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../services/database_service.dart';
@@ -27,7 +28,6 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
   bool _loading = true;
   bool _saving = false;
 
-  // Drawing state
   Offset? _dragStart;
   Offset? _dragCurrent;
 
@@ -86,8 +86,7 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
 
       final saveResult = await showSavePdfDialog(
         context,
-        defaultName:
-            '${widget.fileName.replaceAll('.pdf', '')}_edited',
+        defaultName: '${widget.fileName.replaceAll('.pdf', '')}_edited',
       );
       if (saveResult == null) {
         await file.delete();
@@ -126,8 +125,8 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           title: const Row(
             children: [
               Icon(Icons.text_fields_rounded, color: Color(0xFF2563EB)),
@@ -151,8 +150,7 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Text('الحجم:',
-                      style: TextStyle(fontSize: 12)),
+                  const Text('الحجم:', style: TextStyle(fontSize: 12)),
                   Expanded(
                     child: Slider(
                       value: fontSize,
@@ -180,8 +178,7 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
                     Colors.green,
                   ])
                     GestureDetector(
-                      onTap: () =>
-                          setDialogState(() => chosenColor = c),
+                      onTap: () => setDialogState(() => chosenColor = c),
                       child: Container(
                         width: 32,
                         height: 32,
@@ -254,10 +251,11 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
     }
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF8FAFC),
+      backgroundColor:
+          isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(widget.fileName,
-            maxLines: 1, overflow: TextOverflow.ellipsis),
+        title:
+            Text(widget.fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           if (_edits.isNotEmpty)
             IconButton(
@@ -266,8 +264,7 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
               onPressed: _undo,
             ),
           IconButton(
-            icon: const Icon(Icons.layers_clear_rounded,
-                color: Colors.orange),
+            icon: const Icon(Icons.layers_clear_rounded, color: Colors.orange),
             tooltip: 'مسح تعديلات الصفحة',
             onPressed: _clearPage,
           ),
@@ -287,7 +284,6 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
       ),
       body: Column(
         children: [
-          // Page navigation
           if (_pageImages.length > 1)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -336,12 +332,10 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final pngBytes = _pageImages[_currentPage];
-        final imageSize =
-            PdfEditorService.instance.getImageSize(pngBytes);
+        final imageSize = PdfEditorService.instance.getImageSize(pngBytes);
         final imageAspect = imageSize.width / imageSize.height;
         final widgetAspect = constraints.maxWidth / constraints.maxHeight;
 
-        // Compute displayed image rect (BoxFit.contain)
         Rect imageRect;
         if (imageAspect > widgetAspect) {
           final h = constraints.maxWidth / imageAspect;
@@ -383,12 +377,12 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
                 edits: pageEdits,
                 imageRect: imageRect,
                 imageSize: imageSize,
-                dragStart:
-                    _dragStart != null ? toScreen(fromScreen(_dragStart!)) : null,
+                dragStart: _dragStart != null
+                    ? toScreen(fromScreen(_dragStart!))
+                    : null,
                 dragCurrent: _dragCurrent != null
                     ? toScreen(fromScreen(_dragCurrent!))
                     : null,
-                cairoFontMissing: false,
               ),
             ),
           ],
@@ -396,8 +390,7 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
 
         if (_tool == EditorTool.cover) {
           return GestureDetector(
-            onPanStart: (d) =>
-                setState(() => _dragStart = d.localPosition),
+            onPanStart: (d) => setState(() => _dragStart = d.localPosition),
             onPanUpdate: (d) =>
                 setState(() => _dragCurrent = d.localPosition),
             onPanEnd: (d) {
@@ -509,10 +502,8 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
                   color: active ? color : null,
                 ),
               ),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 9, color: Colors.grey),
-              ),
+              Text(subtitle,
+                  style: const TextStyle(fontSize: 9, color: Colors.grey)),
             ],
           ),
         ),
@@ -521,17 +512,12 @@ class _PdfEditorScreenState extends State<PdfEditorScreen> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// PAINTER
-// ═══════════════════════════════════════════════════════════════════
-
 class _EditsPainter extends CustomPainter {
   final List<PdfEdit> edits;
   final Rect imageRect;
   final Size imageSize;
   final Offset? dragStart;
   final Offset? dragCurrent;
-  final bool cairoFontMissing;
 
   _EditsPainter({
     required this.edits,
@@ -539,7 +525,6 @@ class _EditsPainter extends CustomPainter {
     required this.imageSize,
     required this.dragStart,
     required this.dragCurrent,
-    required this.cairoFontMissing,
   });
 
   Offset _toScreen(Offset n) => Offset(
@@ -555,10 +540,7 @@ class _EditsPainter extends CustomPainter {
           _toScreen(edit.normalizedBounds.topLeft),
           _toScreen(edit.normalizedBounds.bottomRight),
         );
-        canvas.drawRect(
-          r,
-          Paint()..color = edit.color ?? Colors.white,
-        );
+        canvas.drawRect(r, Paint()..color = edit.color ?? Colors.white);
       } else {
         final p = _toScreen(edit.normalizedBounds.topLeft);
         final tp = TextPainter(
@@ -567,7 +549,6 @@ class _EditsPainter extends CustomPainter {
             style: TextStyle(
               fontSize: edit.fontSize,
               color: edit.color ?? Colors.black,
-              fontWeight: FontWeight.normal,
             ),
           ),
           textDirection: TextDirection.rtl,
@@ -577,7 +558,6 @@ class _EditsPainter extends CustomPainter {
       }
     }
 
-    // Draw active drag
     if (dragStart != null && dragCurrent != null) {
       final r = Rect.fromPoints(dragStart!, dragCurrent!);
       canvas.drawRect(
