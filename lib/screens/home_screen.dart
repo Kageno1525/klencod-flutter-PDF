@@ -1,19 +1,18 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import '../main.dart';
 import '../services/database_service.dart';
 import '../services/pdf_tools_service.dart';
+import '../widgets/common.dart';
+import 'favorites_screen.dart';
 import 'group_screen.dart';
 import 'pdf_viewer_screen.dart';
-
-// ═══════════════════════════════════════════════════════════════════
-// SHELL
-// ═══════════════════════════════════════════════════════════════════
+import 'recent_screen.dart';
+import 'settings_screen.dart';
+import 'tools_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,6 +26,13 @@ class _HomeScreenState extends State<HomeScreen> {
   final _pageCtrl = PageController();
   int _tab = 0;
   int _refreshTick = 0;
+
+  // Selection state
+  final Map<int, Map<String, dynamic>> _selectedFiles = {};
+  bool get _inSelectionMode => _selectedFiles.isNotEmpty;
+
+  // Files loaded in current tab (for "select all")
+  List<Map<String, dynamic>> _currentTabFiles = [];
 
   static const _titles = [
     'مستودع PDF',
@@ -45,7 +51,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void _bumpRefresh() => setState(() => _refreshTick++);
 
   void _onTabSelected(int i) {
-    setState(() => _tab = i);
+    setState(() {
+      _selectedFiles.clear();
+      _tab = i;
+    });
     _pageCtrl.animateToPage(
       i,
       duration: const Duration(milliseconds: 320),
@@ -53,44 +62,199 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ────── Selection ──────
+  void _toggleSelection(Map<String, dynamic> f) {
+    setState(() {
+      final id = f['id'] as int;
+      if (_selectedFiles.containsKey(id)) {
+        _selectedFiles.remove(id);
+      } else {
+        _selectedFiles[id] = f;
+      }
+    });
+  }
+
+  void _enterSelection(Map<String, dynamic> f) {
+    setState(() {
+      _selectedFiles[f['id'] as int] = f;
+    });
+  }
+
+  void _clearSelection() => setState(() => _selectedFiles.clear());
+
+  void _selectAll() {
+    setState(() {
+      for (final f in _currentTabFiles) {
+        _selectedFiles[f['id'] as int] = f;
+      }
+    });
+  }
+
+  void _onFilesLoaded(List<Map<String, dynamic>> files) {
+    _currentTabFiles = files;
+  }
+
+  Future<void> _batchDelete() async {
+    final count = _selectedFiles.length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text('حذف $count ملف؟'),
+        content: const Text('هيتم حذفهم من التطبيق والجهاز نهائياً.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await batchDelete(_selectedFiles.values.toList());
+      _clearSelection();
+      _bumpRefresh();
+    }
+  }
+
+  Future<void> _batchFavorite() async {
+    await batchFavorite(_selectedFiles.values.toList(), true);
+    _clearSelection();
+    _bumpRefresh();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تمت الإضافة للمفضلة')),
+    );
+  }
+
+  Future<void> _batchMove() async {
+    final target = await pickGroup(context, title: 'نقل إلى...');
+    if (target == null) return;
+    final gid = target == -1 ? null : target;
+    await batchMove(_selectedFiles.values.toList(), gid);
+    _clearSelection();
+    _bumpRefresh();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم النقل')),
+    );
+  }
+
+  Future<void> _batchTag() async {
+    final color = await pickTagColor(context);
+    if (color == null) return;
+    await batchTag(_selectedFiles.values.toList(), color);
+    _clearSelection();
+    _bumpRefresh();
+  }
+
+  // ────── Normal AppBar ──────
+  PreferredSizeWidget _buildNormalAppBar() {
+    final tp = context.watch<ThemeProvider>();
+    return AppBar(
+      leading: Builder(
+        builder: (ctx) => IconButton(
+          icon: const Icon(Icons.menu_rounded, size: 26),
+          onPressed: () => Scaffold.of(ctx).openDrawer(),
+          tooltip: 'القائمة',
+        ),
+      ),
+      title: Text(
+        _titles[_tab],
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+      ),
+      actions: [
+        ThemeToggleButton(isDark: tp.isDark, onTap: tp.toggleTheme),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  // ────── Selection AppBar ──────
+  PreferredSizeWidget _buildSelectionAppBar() {
+    final primary = Theme.of(context).colorScheme.primary;
+    return AppBar(
+      backgroundColor: primary.withOpacity(0.08),
+      leading: IconButton(
+        icon: const Icon(Icons.close_rounded),
+        onPressed: _clearSelection,
+        tooltip: 'إلغاء التحديد',
+      ),
+      title: Text(
+        '${_selectedFiles.length} محدد',
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.select_all_rounded),
+          onPressed: _selectAll,
+          tooltip: 'تحديد الكل',
+        ),
+        IconButton(
+          icon: const Icon(Icons.label_rounded),
+          onPressed: _batchTag,
+          tooltip: 'وسم',
+        ),
+        IconButton(
+          icon: const Icon(Icons.drive_file_move_rounded),
+          onPressed: _batchMove,
+          tooltip: 'نقل',
+        ),
+        IconButton(
+          icon: const Icon(Icons.star_rounded, color: Colors.amber),
+          onPressed: _batchFavorite,
+          tooltip: 'مفضلة',
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete_rounded, color: Colors.red),
+          onPressed: _batchDelete,
+          tooltip: 'حذف',
+        ),
+        const SizedBox(width: 4),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final tp = context.watch<ThemeProvider>();
     return Scaffold(
       extendBody: true,
       drawer: _buildDrawer(),
-      appBar: AppBar(
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_rounded, size: 26),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-            tooltip: 'القائمة',
-          ),
-        ),
-        title: Text(
-          _titles[_tab],
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        actions: [
-          _ThemeToggleButton(isDark: tp.isDark, onTap: tp.toggleTheme),
-          const SizedBox(width: 8),
-        ],
-      ),
+      appBar: _inSelectionMode ? _buildSelectionAppBar() : _buildNormalAppBar(),
       body: PageView(
         controller: _pageCtrl,
         physics: const NeverScrollableScrollPhysics(),
         onPageChanged: (i) => setState(() => _tab = i),
         children: [
-          _HomeTab(
+          HomeTab(
             refreshTick: _refreshTick,
-            onOpenGroup: _openGroup,
-            onOpenFile: _openFile,
-            onOpenFileOptions: _openFileOptions,
-            onOpenGroupOptions: _openGroupOptions,
+            onChanged: _bumpRefresh,
+            selectedFiles: _selectedFiles,
+            onToggleSelection: _toggleSelection,
+            onEnterSelection: _enterSelection,
+            onFilesLoaded: _onFilesLoaded,
           ),
-          _FavoritesTab(refreshTick: _refreshTick, onOpenFile: _openFile),
-          _RecentTab(refreshTick: _refreshTick, onOpenFile: _openFile),
-          _ToolsTab(
+          FavoritesScreen(
+            refreshTick: _refreshTick,
+            onChanged: _bumpRefresh,
+            selectedFiles: _selectedFiles,
+            onToggleSelection: _toggleSelection,
+            onEnterSelection: _enterSelection,
+            onFilesLoaded: _onFilesLoaded,
+          ),
+          RecentScreen(
+            refreshTick: _refreshTick,
+            onChanged: _bumpRefresh,
+            selectedFiles: _selectedFiles,
+            onToggleSelection: _toggleSelection,
+            onEnterSelection: _enterSelection,
+            onFilesLoaded: _onFilesLoaded,
+          ),
+          ToolsScreen(
             onImport: _importPdfs,
             onImagesToPdf: _imagesToPdf,
             onCameraScan: _cameraScan,
@@ -98,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onBackupDb: _backupDb,
             onRestore: _restore,
           ),
-          const _SettingsTab(),
+          const SettingsScreen(),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -141,7 +305,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      floatingActionButton: _tab == 0 ? _buildFab() : null,
+      floatingActionButton:
+          _tab == 0 && !_inSelectionMode ? _buildFab() : null,
     );
   }
 
@@ -209,7 +374,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontSize: 20,
                               fontWeight: FontWeight.bold)),
                       Text('مستودع ملفاتك',
-                          style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          style:
+                              TextStyle(color: Colors.white70, fontSize: 12)),
                     ],
                   ),
                 ],
@@ -277,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _AddMenuSheet(
+      builder: (_) => AddMenuSheet(
         onImport: () {
           Navigator.pop(context);
           _importPdfs();
@@ -298,13 +464,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _importPdfs() async {
+  Future<void> _importPdfs({int? presetGroupId}) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
       allowMultiple: true,
     );
     if (result == null || result.files.isEmpty) return;
+
+    int? groupId = presetGroupId;
+    if (presetGroupId == null) {
+      if (!mounted) return;
+      final target = await pickGroup(context, title: 'أين تحفظ الملفات؟');
+      if (target == null) return; // cancelled
+      groupId = target == -1 ? null : target;
+    }
+
     final appDir = await getApplicationDocumentsDirectory();
     final pdfDir = Directory('${appDir.path}/pdfs');
     if (!await pdfDir.exists()) await pdfDir.create(recursive: true);
@@ -314,7 +489,12 @@ class _HomeScreenState extends State<HomeScreen> {
           '${pdfDir.path}/${DateTime.now().millisecondsSinceEpoch}_${f.name}';
       await File(f.path!).copy(dest);
       final stat = await File(dest).stat();
-      await _db.insertFile(name: f.name, path: dest, size: stat.size);
+      await _db.insertFile(
+        name: f.name,
+        path: dest,
+        size: stat.size,
+        groupId: groupId,
+      );
     }
     _bumpRefresh();
     if (!mounted) return;
@@ -335,9 +515,8 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('خطأ: $e')));
     }
   }
 
@@ -358,9 +537,8 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('خطأ: $e')));
     }
   }
 
@@ -411,9 +589,8 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('خطأ: $e')));
     }
   }
 
@@ -433,9 +610,8 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('خطأ: $e')));
     }
   }
 
@@ -464,46 +640,9 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('خطأ: $e')));
     }
-  }
-
-  Future<void> _openFile(Map<String, dynamic> f) async {
-    await _db.markOpened(f['id']);
-    if (!mounted) return;
-    await Navigator.push(
-      context,
-      _pageRoute(PdfViewerScreen(filePath: f['path'], fileName: f['name'])),
-    );
-    _bumpRefresh();
-  }
-
-  void _openGroup(Map<String, dynamic> g) async {
-    await Navigator.push(
-      context,
-      _pageRoute(GroupScreen(groupId: g['id'], groupName: g['name'])),
-    );
-    _bumpRefresh();
-  }
-
-  void _openFileOptions(Map<String, dynamic> f) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _FileOptionsSheet(file: f, onChanged: _bumpRefresh),
-    );
-  }
-
-  void _openGroupOptions(Map<String, dynamic> g) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _GroupOptionsSheet(group: g, onChanged: _bumpRefresh),
-    );
   }
 
   void _showAbout() {
@@ -542,36 +681,42 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// TAB 0: HOME
+// HOME TAB
 // ═══════════════════════════════════════════════════════════════════
 
-class _HomeTab extends StatefulWidget {
+class HomeTab extends StatefulWidget {
   final int refreshTick;
-  final Future<void> Function(Map<String, dynamic>) onOpenFile;
-  final void Function(Map<String, dynamic>) onOpenGroup;
-  final void Function(Map<String, dynamic>) onOpenFileOptions;
-  final void Function(Map<String, dynamic>) onOpenGroupOptions;
+  final VoidCallback onChanged;
+  final Map<int, Map<String, dynamic>> selectedFiles;
+  final void Function(Map<String, dynamic>) onToggleSelection;
+  final void Function(Map<String, dynamic>) onEnterSelection;
+  final void Function(List<Map<String, dynamic>>) onFilesLoaded;
 
-  const _HomeTab({
+  const HomeTab({
+    super.key,
     required this.refreshTick,
-    required this.onOpenFile,
-    required this.onOpenGroup,
-    required this.onOpenFileOptions,
-    required this.onOpenGroupOptions,
+    required this.onChanged,
+    required this.selectedFiles,
+    required this.onToggleSelection,
+    required this.onEnterSelection,
+    required this.onFilesLoaded,
   });
 
   @override
-  State<_HomeTab> createState() => _HomeTabState();
+  State<HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<_HomeTab> {
+class _HomeTabState extends State<HomeTab> {
   final _db = DatabaseService.instance;
   List<Map<String, dynamic>> _groups = [];
   List<Map<String, dynamic>> _files = [];
   bool _loading = true;
   String _sortBy = 'added_at DESC';
+  String? _category;
   final _searchCtrl = TextEditingController();
   String _search = '';
+
+  bool get _inSelectionMode => widget.selectedFiles.isNotEmpty;
 
   @override
   void initState() {
@@ -580,7 +725,7 @@ class _HomeTabState extends State<_HomeTab> {
   }
 
   @override
-  void didUpdateWidget(_HomeTab old) {
+  void didUpdateWidget(HomeTab old) {
     super.didUpdateWidget(old);
     if (widget.refreshTick != old.refreshTick) _load();
   }
@@ -589,7 +734,7 @@ class _HomeTabState extends State<_HomeTab> {
     if (mounted) setState(() => _loading = true);
     final groups = await _db.getGroups(parentId: null);
     final files = _search.isEmpty
-        ? await _db.getFiles(sortBy: _sortBy)
+        ? await _db.getFiles(sortBy: _sortBy, autoCategory: _category)
         : await _db.searchFiles(_search);
     if (!mounted) return;
     setState(() {
@@ -597,11 +742,12 @@ class _HomeTabState extends State<_HomeTab> {
       _files = files;
       _loading = false;
     });
+    widget.onFilesLoaded(files);
   }
 
   @override
   Widget build(BuildContext context) {
-    return _AppBackground(
+    return AppBackground(
       child: RefreshIndicator(
         onRefresh: _load,
         child: CustomScrollView(
@@ -610,10 +756,22 @@ class _HomeTabState extends State<_HomeTab> {
           ),
           slivers: [
             SliverToBoxAdapter(child: _buildSearch()),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: CategoryChips(
+                  selected: _category,
+                  onSelected: (c) {
+                    setState(() => _category = c);
+                    _load();
+                  },
+                ),
+              ),
+            ),
             SliverToBoxAdapter(child: _buildSortChips()),
-            if (_groups.isNotEmpty) ...[
+            if (_groups.isNotEmpty && !_inSelectionMode) ...[
               SliverToBoxAdapter(
-                child: _SectionHeader(
+                child: SectionHeader(
                   icon: Icons.folder_rounded,
                   title: 'المجموعات',
                   color: Colors.amber,
@@ -627,11 +785,10 @@ class _HomeTabState extends State<_HomeTab> {
                   itemBuilder: (ctx, i) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: RepaintBoundary(
-                      child: _GroupTile(
+                      child: GroupTile(
                         group: _groups[i],
-                        onTap: () => widget.onOpenGroup(_groups[i]),
-                        onLongPress: () =>
-                            widget.onOpenGroupOptions(_groups[i]),
+                        onTap: () => _openGroup(_groups[i]),
+                        onLongPress: () => _openGroupOptions(_groups[i]),
                       ),
                     ),
                   ),
@@ -640,7 +797,7 @@ class _HomeTabState extends State<_HomeTab> {
             ],
             if (_files.isNotEmpty) ...[
               SliverToBoxAdapter(
-                child: _SectionHeader(
+                child: SectionHeader(
                   icon: Icons.picture_as_pdf_rounded,
                   title: _search.isEmpty ? 'الملفات' : 'نتائج البحث',
                   color: const Color(0xFFDC2626),
@@ -651,17 +808,35 @@ class _HomeTabState extends State<_HomeTab> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverList.builder(
                   itemCount: _files.length,
-                  itemBuilder: (ctx, i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: RepaintBoundary(
-                      child: _FileTile(
-                        file: _files[i],
-                        onTap: () => widget.onOpenFile(_files[i]),
-                        onLongPress: () =>
-                            widget.onOpenFileOptions(_files[i]),
+                  itemBuilder: (ctx, i) {
+                    final f = _files[i];
+                    final isSel =
+                        widget.selectedFiles.containsKey(f['id']);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: RepaintBoundary(
+                        child: FileTile(
+                          file: f,
+                          isSelected: isSel,
+                          inSelectionMode: _inSelectionMode,
+                          onTap: () {
+                            if (_inSelectionMode) {
+                              widget.onToggleSelection(f);
+                            } else {
+                              _openFile(f);
+                            }
+                          },
+                          onLongPress: () {
+                            if (!_inSelectionMode) {
+                              widget.onEnterSelection(f);
+                            } else {
+                              widget.onToggleSelection(f);
+                            }
+                          },
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -674,10 +849,9 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             if (!_loading && _groups.isEmpty && _files.isEmpty)
               SliverToBoxAdapter(
-                child: _EmptyState(
+                child: EmptyState(
                   icon: Icons.folder_open_rounded,
-                  title:
-                      _search.isEmpty ? 'لا توجد ملفات بعد' : 'لا توجد نتائج',
+                  title: _search.isEmpty ? 'لا توجد ملفات بعد' : 'لا توجد نتائج',
                   subtitle: _search.isEmpty
                       ? 'اضغط زر + لإضافة ملف أو مجموعة'
                       : 'جرّب كلمة بحث أخرى',
@@ -802,1366 +976,40 @@ class _HomeTabState extends State<_HomeTab> {
       ),
     );
   }
-}
 
-// ═══════════════════════════════════════════════════════════════════
-// TAB 1: FAVORITES
-// ═══════════════════════════════════════════════════════════════════
-
-class _FavoritesTab extends StatefulWidget {
-  final int refreshTick;
-  final Future<void> Function(Map<String, dynamic>) onOpenFile;
-  const _FavoritesTab({required this.refreshTick, required this.onOpenFile});
-  @override
-  State<_FavoritesTab> createState() => _FavoritesTabState();
-}
-
-class _FavoritesTabState extends State<_FavoritesTab> {
-  final _db = DatabaseService.instance;
-  List<Map<String, dynamic>> _files = [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
+  void _openGroup(Map<String, dynamic> g) async {
+    await Navigator.push(
+      context,
+      pageRoute(GroupScreen(groupId: g['id'], groupName: g['name'])),
+    );
+    widget.onChanged();
   }
 
-  @override
-  void didUpdateWidget(_FavoritesTab old) {
-    super.didUpdateWidget(old);
-    if (widget.refreshTick != old.refreshTick) _load();
-  }
-
-  Future<void> _load() async {
-    if (mounted) setState(() => _loading = true);
-    final files =
-        await _db.getFiles(favoritesOnly: true, sortBy: 'added_at DESC');
+  Future<void> _openFile(Map<String, dynamic> f) async {
+    await _db.markOpened(f['id']);
     if (!mounted) return;
-    setState(() {
-      _files = files;
-      _loading = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _AppBackground(
-      child: RefreshIndicator(
-        onRefresh: _load,
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _files.isEmpty
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: const [
-                      SizedBox(height: 80),
-                      _EmptyState(
-                        icon: Icons.star_outline_rounded,
-                        title: 'لا توجد ملفات مفضلة',
-                        subtitle: 'اضغط مطولاً على أي ملف لإضافته للمفضلة',
-                        color: Colors.amber,
-                      ),
-                    ],
-                  )
-                : ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics()),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-                    itemCount: _files.length,
-                    itemBuilder: (ctx, i) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: RepaintBoundary(
-                        child: _FileTile(
-                          file: _files[i],
-                          onTap: () => widget.onOpenFile(_files[i]),
-                        ),
-                      ),
-                    ),
-                  ),
-      ),
+    await Navigator.push(
+      context,
+      pageRoute(PdfViewerScreen(filePath: f['path'], fileName: f['name'])),
     );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// TAB 2: RECENT
-// ═══════════════════════════════════════════════════════════════════
-
-class _RecentTab extends StatefulWidget {
-  final int refreshTick;
-  final Future<void> Function(Map<String, dynamic>) onOpenFile;
-  const _RecentTab({required this.refreshTick, required this.onOpenFile});
-  @override
-  State<_RecentTab> createState() => _RecentTabState();
-}
-
-class _RecentTabState extends State<_RecentTab> {
-  final _db = DatabaseService.instance;
-  List<Map<String, dynamic>> _files = [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
+    widget.onChanged();
   }
 
-  @override
-  void didUpdateWidget(_RecentTab old) {
-    super.didUpdateWidget(old);
-    if (widget.refreshTick != old.refreshTick) _load();
-  }
-
-  Future<void> _load() async {
-    if (mounted) setState(() => _loading = true);
-    final files = await _db.getRecentFiles(limit: 50);
-    if (!mounted) return;
-    setState(() {
-      _files = files;
-      _loading = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _AppBackground(
-      child: RefreshIndicator(
-        onRefresh: _load,
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _files.isEmpty
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: const [
-                      SizedBox(height: 80),
-                      _EmptyState(
-                        icon: Icons.history_rounded,
-                        title: 'لا يوجد سجل بعد',
-                        subtitle: 'افتح أي ملف PDF وسيظهر هنا',
-                        color: Color(0xFF2563EB),
-                      ),
-                    ],
-                  )
-                : ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics()),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-                    itemCount: _files.length,
-                    itemBuilder: (ctx, i) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: RepaintBoundary(
-                        child: _FileTile(
-                          file: _files[i],
-                          onTap: () => widget.onOpenFile(_files[i]),
-                          showOpenTime: true,
-                        ),
-                      ),
-                    ),
-                  ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// TAB 3: TOOLS
-// ═══════════════════════════════════════════════════════════════════
-
-class _ToolsTab extends StatelessWidget {
-  final VoidCallback onImport;
-  final VoidCallback onImagesToPdf;
-  final VoidCallback onCameraScan;
-  final VoidCallback onBackupFull;
-  final VoidCallback onBackupDb;
-  final VoidCallback onRestore;
-
-  const _ToolsTab({
-    required this.onImport,
-    required this.onImagesToPdf,
-    required this.onCameraScan,
-    required this.onBackupFull,
-    required this.onBackupDb,
-    required this.onRestore,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return _AppBackground(
-      child: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-        children: [
-          const _SectionHeader(
-            icon: Icons.handyman_rounded,
-            title: 'أدوات الملفات',
-            color: Color(0xFFDC2626),
-            showTopPadding: false,
-          ),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.05,
-            children: [
-              _ToolCard(
-                icon: Icons.upload_file_rounded,
-                colors: const [Color(0xFFDC2626), Color(0xFFEF4444)],
-                label: 'استيراد PDF',
-                onTap: onImport,
-              ),
-              _ToolCard(
-                icon: Icons.image_rounded,
-                colors: const [Color(0xFF2563EB), Color(0xFF3B82F6)],
-                label: 'صور إلى PDF',
-                onTap: onImagesToPdf,
-              ),
-              _ToolCard(
-                icon: Icons.camera_alt_rounded,
-                colors: const [Color(0xFFF59E0B), Color(0xFFEF4444)],
-                label: 'مسح بالكاميرا',
-                onTap: onCameraScan,
-              ),
-              _ToolCard(
-                icon: Icons.backup_rounded,
-                colors: const [Color(0xFF06B6D4), Color(0xFF2563EB)],
-                label: 'نسخة كاملة',
-                onTap: onBackupFull,
-              ),
-              _ToolCard(
-                icon: Icons.storage_rounded,
-                colors: const [Color(0xFF10B981), Color(0xFF059669)],
-                label: 'نسخة الداتابيز',
-                onTap: onBackupDb,
-              ),
-              _ToolCard(
-                icon: Icons.restore_rounded,
-                colors: const [Color(0xFFDC2626), Color(0xFF2563EB)],
-                label: 'استعادة',
-                onTap: onRestore,
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const _SectionHeader(
-            icon: Icons.hourglass_top_rounded,
-            title: 'قريباً',
-            color: Colors.grey,
-            showTopPadding: false,
-          ),
-          _ComingSoonItem(icon: Icons.merge_type_rounded, label: 'دمج ملفات PDF'),
-          _ComingSoonItem(icon: Icons.content_cut_rounded, label: 'تقسيم PDF'),
-          _ComingSoonItem(icon: Icons.text_fields_rounded, label: 'علامة مائية'),
-          _ComingSoonItem(icon: Icons.search_rounded, label: 'البحث داخل PDF'),
-          _ComingSoonItem(icon: Icons.print_rounded, label: 'طباعة مباشرة'),
-        ],
-      ),
-    );
-  }
-}
-
-class _ToolCard extends StatelessWidget {
-  final IconData icon;
-  final List<Color> colors;
-  final String label;
-  final VoidCallback? onTap;
-  const _ToolCard({
-    required this.icon,
-    required this.colors,
-    required this.label,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-      borderRadius: BorderRadius.circular(24),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        splashColor: Colors.transparent,
-        highlightColor:
-            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: colors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(icon, color: Colors.white, size: 28),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ComingSoonItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _ComingSoonItem({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark
-              ? const Color(0xFF1A1A2E).withOpacity(0.5)
-              : Colors.white.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.06)
-                : Colors.black.withOpacity(0.04),
-            width: 1,
-          ),
-        ),
-        child: ListTile(
-          leading: Icon(icon, color: Colors.grey, size: 22),
-          title: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'قريباً',
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// TAB 4: SETTINGS
-// ═══════════════════════════════════════════════════════════════════
-
-class _SettingsTab extends StatelessWidget {
-  const _SettingsTab();
-
-  @override
-  Widget build(BuildContext context) {
-    final tp = context.watch<ThemeProvider>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return _AppBackground(
-      child: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-        children: [
-          const _SectionHeader(
-            icon: Icons.palette_rounded,
-            title: 'المظهر',
-            color: Color(0xFFDC2626),
-            showTopPadding: false,
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.black.withOpacity(0.06),
-                width: 1,
-              ),
-            ),
-            child: SwitchListTile(
-              secondary: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isDark
-                        ? const [Color(0xFFFBBF24), Color(0xFFF97316)]
-                        : const [Color(0xFFDC2626), Color(0xFF2563EB)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              title: const Text('الوضع الداكن',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: Text(
-                tp.isDark ? 'مُفعّل' : 'معطّل',
-                style: const TextStyle(fontSize: 12),
-              ),
-              value: tp.isDark,
-              onChanged: (_) => tp.toggleTheme(),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const _SectionHeader(
-            icon: Icons.info_rounded,
-            title: 'معلومات',
-            color: Color(0xFF2563EB),
-            showTopPadding: false,
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.black.withOpacity(0.06),
-                width: 1,
-              ),
-            ),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.apps_rounded, size: 22),
-                  title:
-                      const Text('اسم التطبيق', style: TextStyle(fontSize: 13)),
-                  trailing: const Text('PDF Vault',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.bold)),
-                ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                const ListTile(
-                  leading: Icon(Icons.numbers_rounded, size: 22),
-                  title: Text('الإصدار', style: TextStyle(fontSize: 13)),
-                  trailing: Text('1.0.0',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.bold)),
-                ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                ListTile(
-                  leading: const Icon(Icons.storage_rounded, size: 22),
-                  title: const Text('مكان النسخ الاحتياطية',
-                      style: TextStyle(fontSize: 13)),
-                  subtitle: const Text(
-                    'Downloads/PdfVault',
-                    style: TextStyle(fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          const _SectionHeader(
-            icon: Icons.favorite_rounded,
-            title: 'عن التطبيق',
-            color: Color(0xFFDC2626),
-            showTopPadding: false,
-          ),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFDC2626), Color(0xFF2563EB)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.picture_as_pdf_rounded,
-                        color: Colors.white, size: 32),
-                    SizedBox(width: 12),
-                    Text(
-                      'PDF Vault',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12),
-                Text(
-                  'مستودعك الشخصي لملفات PDF\nمع مجموعات متداخلة، بحث ذكي، وأدوات احترافية.',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    height: 1.6,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// SHARED WIDGETS
-// ═══════════════════════════════════════════════════════════════════
-
-class _AppBackground extends StatelessWidget {
-  final Widget child;
-  const _AppBackground({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: isDark
-              ? const [Color(0xFF0F0F1A), Color(0xFF1A1A2E)]
-              : const [Color(0xFFFEF2F2), Color(0xFFEFF6FF)],
-        ),
-      ),
-      child: child,
-    );
-  }
-}
-
-class _ThemeToggleButton extends StatelessWidget {
-  final bool isDark;
-  final VoidCallback onTap;
-  const _ThemeToggleButton({required this.isDark, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        splashColor: Colors.white.withOpacity(0.2),
-        highlightColor: Colors.transparent,
-        child: Ink(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isDark
-                  ? const [Color(0xFFFBBF24), Color(0xFFF97316)]
-                  : const [Color(0xFFDC2626), Color(0xFF2563EB)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-            color: Colors.white,
-            size: 22,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final Color color;
-  final String? trailing;
-  final bool showTopPadding;
-
-  const _SectionHeader({
-    required this.icon,
-    required this.title,
-    required this.color,
-    this.trailing,
-    this.showTopPadding = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, showTopPadding ? 20 : 0, 16, 12),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-          ),
-          const Spacer(),
-          if (trailing != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                trailing!,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GroupTile extends StatelessWidget {
-  final Map<String, dynamic> group;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  const _GroupTile({
-    required this.group,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        splashColor: Colors.transparent,
-        highlightColor:
-            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          leading: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.folder_rounded,
-                color: Colors.white, size: 26),
-          ),
-          title: Text(
-            group['name'],
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          ),
-          subtitle: const Text('مجموعة',
-              style: TextStyle(fontSize: 11, color: Colors.grey)),
-          trailing: Icon(Icons.chevron_right_rounded,
-              color: Colors.grey.withOpacity(0.6)),
-        ),
-      ),
-    );
-  }
-}
-
-class _FileTile extends StatelessWidget {
-  final Map<String, dynamic> file;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final bool showOpenTime;
-
-  const _FileTile({
-    required this.file,
-    required this.onTap,
-    this.onLongPress,
-    this.showOpenTime = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final tagColor =
-        file['tag_color'] != null ? Color(file['tag_color'] as int) : null;
-    final isFav = file['is_favorite'] == 1;
-    final when =
-        showOpenTime ? file['last_opened_at'] as int? : file['added_at'] as int;
-    final dateStr = when != null
-        ? DateFormat('yyyy/MM/dd')
-            .format(DateTime.fromMillisecondsSinceEpoch(when))
-        : '';
-
-    return Material(
-      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        splashColor: Colors.transparent,
-        highlightColor:
-            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.picture_as_pdf_rounded,
-                    color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      file['name'],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        if (tagColor != null) ...[
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                                color: tagColor, shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        Text(
-                          '${_sizeText(file['size'])} · $dateStr',
-                          style: const TextStyle(
-                              fontSize: 11, color: Colors.grey),
-                        ),
-                        if (isFav) ...[
-                          const SizedBox(width: 6),
-                          const Icon(Icons.star_rounded,
-                              color: Colors.amber, size: 14),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded,
-                  color: Colors.grey.withOpacity(0.6)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color? color;
-
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = color ?? Theme.of(context).colorScheme.primary;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: c.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 50, color: c),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              title,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// SHEETS
-// ═══════════════════════════════════════════════════════════════════
-
-class _AddMenuSheet extends StatelessWidget {
-  final VoidCallback onImport;
-  final VoidCallback onImages;
-  final VoidCallback onCamera;
-  final VoidCallback onGroup;
-
-  const _AddMenuSheet({
-    required this.onImport,
-    required this.onImages,
-    required this.onCamera,
-    required this.onGroup,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text('إضافة جديد',
-                  style:
-                      TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              _addOption(Icons.upload_file_rounded,
-                  const [Color(0xFFDC2626), Color(0xFFEF4444)], 'استيراد ملف PDF', onImport),
-              _addOption(Icons.image_rounded,
-                  const [Color(0xFF2563EB), Color(0xFF3B82F6)], 'صور إلى PDF', onImages),
-              _addOption(Icons.camera_alt_rounded,
-                  const [Color(0xFFF59E0B), Color(0xFFEF4444)], 'مسح بالكاميرا', onCamera),
-              _addOption(Icons.create_new_folder_rounded,
-                  const [Color(0xFFFBBF24), Color(0xFFF59E0B)], 'مجموعة جديدة', onGroup),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _addOption(
-      IconData icon, List<Color> colors, String label, VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          splashColor: Colors.transparent,
-          highlightColor: Colors.black.withOpacity(0.04),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: colors,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios_rounded,
-                    size: 14, color: Colors.grey.withOpacity(0.5)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FileOptionsSheet extends StatelessWidget {
-  final Map<String, dynamic> file;
-  final VoidCallback onChanged;
-
-  const _FileOptionsSheet({required this.file, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final db = DatabaseService.instance;
-    final tools = PdfToolsService.instance;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isFav = file['is_favorite'] == 1;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  children: [
-                    const Icon(Icons.picture_as_pdf_rounded,
-                        color: Color(0xFFDC2626), size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        file['name'],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 24),
-              _opt(
-                Icons.star_rounded,
-                isFav ? Colors.amber.shade700 : Colors.amber,
-                isFav ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
-                () async {
-                  await db.toggleFavorite(file['id'], !isFav);
-                  if (context.mounted) Navigator.pop(context);
-                  onChanged();
-                },
-              ),
-              _opt(Icons.label_rounded, Colors.blue, 'وسم ملون', () async {
-                Navigator.pop(context);
-                final color = await _pickTagColor(context);
-                if (color != null) {
-                  await db.updateFile(
-                    file['id'],
-                    {'tag_color': color.value, 'tag_label': 'وسم'},
-                  );
-                  onChanged();
-                }
-              }),
-              _opt(Icons.share_rounded, Colors.green, 'مشاركة', () {
-                Navigator.pop(context);
-                tools.shareFile(file['path'], file['name']);
-              }),
-              _opt(Icons.qr_code_rounded, Colors.purple, 'عرض QR Code', () {
-                Navigator.pop(context);
-                _showQr(context, file);
-              }),
-              _opt(Icons.edit_rounded, Colors.indigo, 'إعادة تسمية', () async {
-                Navigator.pop(context);
-                await _rename(context, file, onChanged);
-              }),
-              _opt(Icons.delete_rounded, Colors.red, 'حذف نهائي', () async {
-                Navigator.pop(context);
-                await _delete(context, file, onChanged);
-              }),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _opt(IconData icon, Color color, String label, VoidCallback onTap) {
-    return ListTile(
-      dense: true,
-      leading: Icon(icon, color: color, size: 22),
-      title: Text(label,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-      onTap: onTap,
-    );
-  }
-
-  Future<Color?> _pickTagColor(BuildContext context) {
-    const colors = [
-      Colors.red,
-      Colors.orange,
-      Colors.amber,
-      Colors.green,
-      Colors.blue,
-      Colors.purple,
-      Colors.pink,
-    ];
-    return showDialog<Color>(
+  void _openFileOptions(Map<String, dynamic> f) {
+    showModalBottomSheet(
       context: context,
-      builder: (_) => SimpleDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('اختر اللون'),
-        children: colors
-            .map((c) => SimpleDialogOption(
-                  onPressed: () => Navigator.pop(context, c),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                            color: c, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(c.toString().split('(').last.split(')').first),
-                    ],
-                  ),
-                ))
-            .toList(),
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => FileOptionsSheet(file: f, onChanged: widget.onChanged),
     );
   }
 
-  Future<void> _rename(BuildContext context, Map<String, dynamic> file,
-      VoidCallback onDone) async {
-    final ctrl = TextEditingController(text: file['name']);
-    final newName = await showDialog<String>(
+  void _openGroupOptions(Map<String, dynamic> g) {
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('إعادة تسمية'),
-        content: TextField(controller: ctrl),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('حفظ'),
-          ),
-        ],
-      ),
-    );
-    if (newName != null && newName.isNotEmpty) {
-      await DatabaseService.instance
-          .updateFile(file['id'], {'name': newName});
-      onDone();
-    }
-  }
-
-  Future<void> _delete(BuildContext context, Map<String, dynamic> file,
-      VoidCallback onDone) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('حذف الملف؟'),
-        content: const Text('هيتم حذفه من التطبيق والجهاز نهائياً.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      try {
-        await File(file['path']).delete();
-      } catch (_) {}
-      await DatabaseService.instance.deleteFile(file['id']);
-      onDone();
-    }
-  }
-
-  void _showQr(BuildContext context, Map<String, dynamic> file) {
-    final info =
-        'File: ${file['name']}\nSize: ${file['size']} bytes\nAdded: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.fromMillisecondsSinceEpoch(file['added_at']))}';
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(file['name'], maxLines: 2, overflow: TextOverflow.ellipsis),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.white,
-              child: QrImageView(
-                data: info,
-                version: QrVersions.auto,
-                size: 220,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'يحتوي هذا الـ QR على بيانات الملف فقط',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => GroupOptionsSheet(group: g, onChanged: widget.onChanged),
     );
   }
-}
-
-class _GroupOptionsSheet extends StatelessWidget {
-  final Map<String, dynamic> group;
-  final VoidCallback onChanged;
-
-  const _GroupOptionsSheet({required this.group, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  children: [
-                    const Icon(Icons.folder_rounded,
-                        color: Colors.amber, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        group['name'],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 24),
-              ListTile(
-                dense: true,
-                leading: const Icon(Icons.edit_rounded,
-                    color: Colors.indigo, size: 22),
-                title: const Text('إعادة تسمية',
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600)),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final ctrl = TextEditingController(text: group['name']);
-                  final n = await showDialog<String>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24)),
-                      title: const Text('إعادة تسمية'),
-                      content: TextField(controller: ctrl),
-                      actions: [
-                        TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('إلغاء')),
-                        FilledButton(
-                          onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-                          child: const Text('حفظ'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (n != null && n.isNotEmpty) {
-                    final raw = await DatabaseService.instance.database;
-                    await raw.update('groups', {'name': n},
-                        where: 'id = ?', whereArgs: [group['id']]);
-                    onChanged();
-                  }
-                },
-              ),
-              ListTile(
-                dense: true,
-                leading: const Icon(Icons.delete_rounded,
-                    color: Colors.red, size: 22),
-                title: const Text('حذف المجموعة',
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600)),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final ok = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24)),
-                      title: const Text('حذف المجموعة؟'),
-                      content: const Text('سيتم حذف كل ما بداخلها.'),
-                      actions: [
-                        TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('إلغاء')),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                              backgroundColor: Colors.red),
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('حذف'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (ok == true) {
-                    await DatabaseService.instance.deleteGroup(group['id']);
-                    onChanged();
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════════════════
-
-Route _pageRoute(Widget page) {
-  return PageRouteBuilder(
-    pageBuilder: (_, __, ___) => page,
-    transitionDuration: const Duration(milliseconds: 350),
-    transitionsBuilder: (_, animation, __, child) {
-      final curved =
-          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0.06, 0),
-            end: Offset.zero,
-          ).animate(curved),
-          child: child,
-        ),
-      );
-    },
-  );
-}
-
-String _sizeText(int bytes) {
-  if (bytes < 1024) return '$bytes B';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }

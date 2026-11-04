@@ -65,7 +65,6 @@ class DatabaseService {
     );
   }
 
-  // ===== Groups =====
   Future<int> insertGroup(String name, {int? parentId}) async {
     final db = await database;
     return db.insert('groups', {
@@ -85,12 +84,27 @@ class DatabaseService {
     );
   }
 
+  Future<List<Map<String, dynamic>>> getAllGroups() async {
+    final db = await database;
+    return db.query('groups', orderBy: 'name ASC');
+  }
+
+  Future<Map<String, dynamic>?> getGroupById(int id) async {
+    final db = await database;
+    final r = await db.query('groups', where: 'id = ?', whereArgs: [id], limit: 1);
+    return r.isEmpty ? null : r.first;
+  }
+
+  Future<void> updateGroup(int id, String newName) async {
+    final db = await database;
+    await db.update('groups', {'name': newName}, where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<void> deleteGroup(int id) async {
     final db = await database;
     await db.delete('groups', where: 'id = ?', whereArgs: [id]);
   }
 
-  // ===== Files =====
   Future<int> insertFile({
     required String name,
     required String path,
@@ -129,27 +143,38 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getFiles({
     int? groupId,
     bool favoritesOnly = false,
+    String? autoCategory,
+    bool allGroups = false,
     String sortBy = 'added_at DESC',
   }) async {
     final db = await database;
     final where = <String>[];
     final args = <dynamic>[];
-    if (groupId != null) {
-      where.add('group_id = ?');
-      args.add(groupId);
-    } else {
-      where.add('group_id IS NULL');
+    if (!allGroups) {
+      if (groupId != null) {
+        where.add('group_id = ?');
+        args.add(groupId);
+      } else {
+        where.add('group_id IS NULL');
+      }
     }
     if (favoritesOnly) where.add('is_favorite = 1');
+    if (autoCategory != null &&
+        autoCategory.isNotEmpty &&
+        autoCategory != 'الكل') {
+      where.add('auto_category = ?');
+      args.add(autoCategory);
+    }
+    final whereStr = where.isEmpty ? null : where.join(' AND ');
     return db.query(
       'files',
-      where: where.join(' AND '),
+      where: whereStr,
       whereArgs: args.isEmpty ? null : args,
       orderBy: sortBy,
     );
   }
 
-  Future<List<Map<String, dynamic>>> getRecentFiles({int limit = 5}) async {
+  Future<List<Map<String, dynamic>>> getRecentFiles({int limit = 50}) async {
     final db = await database;
     return db.query(
       'files',
@@ -199,7 +224,15 @@ class DatabaseService {
     await db.delete('files', where: 'id = ?', whereArgs: [id]);
   }
 
-  // ===== Backup & Restore =====
+  Future<void> moveFile(int fileId, int? newGroupId) async {
+    final db = await database;
+    await db.update(
+      'files',
+      {'group_id': newGroupId},
+      where: 'id = ?',
+      whereArgs: [fileId],
+    );
+  }
 
   Future<Directory> getBackupDirectory() async {
     try {
@@ -210,7 +243,6 @@ class DatabaseService {
         return dir;
       }
     } catch (_) {}
-
     try {
       final ext = await getExternalStorageDirectory();
       if (ext != null) {
@@ -219,7 +251,6 @@ class DatabaseService {
         return dir;
       }
     } catch (_) {}
-
     final docs = await getApplicationDocumentsDirectory();
     final dir = Directory('${docs.path}/PdfVaultBackups');
     if (!await dir.exists()) await dir.create(recursive: true);
@@ -230,7 +261,6 @@ class DatabaseService {
     final db = await database;
     await db.close();
     _db = null;
-
     try {
       final dbPath = await getDatabasesPath();
       final sourceFile = File(join(dbPath, 'pdf_vault.db'));
@@ -238,66 +268,13 @@ class DatabaseService {
         await database;
         throw Exception('قاعدة البيانات غير موجودة');
       }
-
       final backupDir = await getBackupDirectory();
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
       final backupFile = File(
-        join(backupDir.path, 'pdf_vault_v${appVersion}_$timestamp.db'),
-      );
-
+          join(backupDir.path, 'pdf_vault_v${appVersion}_$timestamp.db'));
       await sourceFile.copy(backupFile.path);
       await database;
       return backupFile;
-    } catch (e) {
-      await database;
-      rethrow;
-    }
-  }
-
-  Future<File> exportFullBackup() async {
-    final db = await database;
-    await db.close();
-    _db = null;
-
-    try {
-      final backupDir = await getBackupDirectory();
-      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final zipPath = join(
-          backupDir.path, 'PdfVaultBackup_v${appVersion}_$timestamp.zip');
-
-      final tempDir = await getTemporaryDirectory();
-      final stagingDir =
-          Directory('${tempDir.path}/backup_staging_$timestamp');
-      if (!await stagingDir.exists()) await stagingDir.create(recursive: true);
-
-      final dbPath = await getDatabasesPath();
-      await File(join(dbPath, 'pdf_vault.db'))
-          .copy('${stagingDir.path}/pdf_vault.db');
-
-      final appDir = await getApplicationDocumentsDirectory();
-      final pdfDir = Directory('${appDir.path}/pdfs');
-      if (await pdfDir.exists()) {
-        final filesDir = Directory('${stagingDir.path}/pdfs');
-        await filesDir.create(recursive: true);
-        await for (final entity in pdfDir.list()) {
-          if (entity is File) {
-            await entity.copy(
-                '${filesDir.path}/${entity.uri.pathSegments.last}');
-          }
-        }
-      }
-
-      await database;
-
-      final result = await Process.run(
-        'zip',
-        ['-r', zipPath, '.'], // best effort; may not be available
-        workingDirectory: stagingDir.path,
-      );
-      if (result.exitCode != 0) {
-        throw Exception('فشل إنشاء ملف ZIP');
-      }
-      return File(zipPath);
     } catch (e) {
       await database;
       rethrow;
@@ -308,16 +285,13 @@ class DatabaseService {
     final db = await database;
     await db.close();
     _db = null;
-
     try {
       final dbPath = await getDatabasesPath();
       final currentDb = File(join(dbPath, 'pdf_vault.db'));
-
       if (await currentDb.exists()) {
         final ts = DateTime.now().millisecondsSinceEpoch;
         await currentDb.copy('${currentDb.path}.safety_$ts');
       }
-
       await File(backupPath).copy(currentDb.path);
       await database;
     } catch (e) {

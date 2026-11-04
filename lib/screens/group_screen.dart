@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../services/database_service.dart';
 import '../services/pdf_tools_service.dart';
+import '../widgets/common.dart';
 import 'pdf_viewer_screen.dart';
 
 class GroupScreen extends StatefulWidget {
@@ -22,6 +23,10 @@ class _GroupScreenState extends State<GroupScreen> {
   List<Map<String, dynamic>> _files = [];
   bool _isLoading = true;
 
+  // Selection
+  final Map<int, Map<String, dynamic>> _selected = {};
+  bool get _inSelectionMode => _selected.isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -37,6 +42,73 @@ class _GroupScreenState extends State<GroupScreen> {
       _files = files;
       _isLoading = false;
     });
+  }
+
+  void _toggleSelection(Map<String, dynamic> f) {
+    setState(() {
+      final id = f['id'] as int;
+      if (_selected.containsKey(id)) {
+        _selected.remove(id);
+      } else {
+        _selected[id] = f;
+      }
+    });
+  }
+
+  void _enterSelection(Map<String, dynamic> f) {
+    setState(() => _selected[f['id'] as int] = f);
+  }
+
+  void _clearSelection() => setState(() => _selected.clear());
+
+  Future<void> _batchDelete() async {
+    final count = _selected.length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text('حذف $count ملف؟'),
+        content: const Text('هيتم حذفهم من التطبيق والجهاز نهائياً.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await batchDelete(_selected.values.toList());
+      _clearSelection();
+      _load();
+    }
+  }
+
+  Future<void> _batchFavorite() async {
+    await batchFavorite(_selected.values.toList(), true);
+    _clearSelection();
+    _load();
+  }
+
+  Future<void> _batchMove() async {
+    final target = await pickGroup(context, title: 'نقل إلى...');
+    if (target == null) return;
+    final gid = target == -1 ? null : target;
+    await batchMove(_selected.values.toList(), gid);
+    _clearSelection();
+    _load();
+  }
+
+  Future<void> _batchTag() async {
+    final color = await pickTagColor(context);
+    if (color == null) return;
+    await batchTag(_selected.values.toList(), color);
+    _clearSelection();
+    _load();
   }
 
   Future<void> _createSub() async {
@@ -89,59 +161,19 @@ class _GroupScreenState extends State<GroupScreen> {
     _load();
   }
 
-  Route _fadeSlideRoute(Widget page) {
-    return PageRouteBuilder(
-      pageBuilder: (_, __, ___) => page,
-      transitionDuration: const Duration(milliseconds: 350),
-      transitionsBuilder: (_, animation, __, child) {
-        final curved =
-            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-        return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(
-                    begin: const Offset(0.06, 0), end: Offset.zero)
-                .animate(curved),
-            child: child,
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(widget.groupName),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.upload_file),
-            onPressed: _importPdfs,
-          ),
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDark
-                ? const [Color(0xFF0F0F1A), Color(0xFF1A1A2E)]
-                : const [Color(0xFFFEF2F2), Color(0xFFEFF6FF)],
-          ),
-        ),
+      appBar: _inSelectionMode ? _selectionAppBar() : _normalAppBar(),
+      body: AppBackground(
         child: SafeArea(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    if (_groups.isNotEmpty) ...[
+                    if (_groups.isNotEmpty && !_inSelectionMode) ...[
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 8),
                         child: Text('📁 مجموعات فرعية',
@@ -150,37 +182,18 @@ class _GroupScreenState extends State<GroupScreen> {
                       ),
                       ..._groups.map((g) => Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: _tile(
-                              isDark: isDark,
+                            child: GroupTile(
+                              group: g,
                               onTap: () async {
                                 await Navigator.push(
                                   context,
-                                  _fadeSlideRoute(GroupScreen(
+                                  pageRoute(GroupScreen(
                                     groupId: g['id'],
                                     groupName: g['name'],
                                   )),
                                 );
                                 _load();
                               },
-                              leading: Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFFFBBF24),
-                                      Color(0xFFF59E0B)
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: const Icon(Icons.folder_rounded,
-                                    color: Colors.white, size: 26),
-                              ),
-                              title: g['name'],
-                              subtitle: 'مجموعة',
-                              trailing: Icon(Icons.chevron_right_rounded,
-                                  color: Colors.grey.withOpacity(0.6)),
                             ),
                           )),
                       const SizedBox(height: 16),
@@ -192,43 +205,31 @@ class _GroupScreenState extends State<GroupScreen> {
                             style: TextStyle(
                                 fontWeight: FontWeight.bold, fontSize: 16)),
                       ),
-                      ..._files.map((f) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _tile(
-                              isDark: isDark,
-                              onTap: () async {
-                                await _db.markOpened(f['id']);
-                                await Navigator.push(
-                                  context,
-                                  _fadeSlideRoute(PdfViewerScreen(
-                                    filePath: f['path'],
-                                    fileName: f['name'],
-                                  )),
-                                );
-                              },
-                              onLongPress: () => _showOptions(f),
-                              leading: Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFFDC2626),
-                                      Color(0xFFEF4444)
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: const Icon(
-                                    Icons.picture_as_pdf_rounded,
-                                    color: Colors.white, size: 24),
-                              ),
-                              title: f['name'],
-                              subtitle: _sizeText(f['size']),
-                              trailing: Icon(Icons.chevron_right_rounded,
-                                  color: Colors.grey.withOpacity(0.6)),
-                            ),
-                          )),
+                      ..._files.map((f) {
+                        final isSel = _selected.containsKey(f['id']);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: FileTile(
+                            file: f,
+                            isSelected: isSel,
+                            inSelectionMode: _inSelectionMode,
+                            onTap: () {
+                              if (_inSelectionMode) {
+                                _toggleSelection(f);
+                              } else {
+                                _openFile(f);
+                              }
+                            },
+                            onLongPress: () {
+                              if (!_inSelectionMode) {
+                                _enterSelection(f);
+                              } else {
+                                _toggleSelection(f);
+                              }
+                            },
+                          ),
+                        );
+                      }),
                     ],
                     if (_groups.isEmpty && _files.isEmpty)
                       const Center(
@@ -242,135 +243,62 @@ class _GroupScreenState extends State<GroupScreen> {
                 ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createSub,
-        child: const Icon(Icons.create_new_folder),
-      ),
+      floatingActionButton: _inSelectionMode
+          ? null
+          : FloatingActionButton(
+              onPressed: _createSub,
+              child: const Icon(Icons.create_new_folder),
+            ),
     );
   }
 
-  Widget _tile({
-    required bool isDark,
-    required VoidCallback onTap,
-    VoidCallback? onLongPress,
-    required Widget leading,
-    required String title,
-    required String subtitle,
-    required Widget trailing,
-  }) {
-    return Material(
-      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        splashColor: Colors.transparent,
-        highlightColor:
-            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              leading,
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(height: 4),
-                    Text(subtitle,
-                        style: const TextStyle(
-                            fontSize: 11, color: Colors.grey)),
-                  ],
-                ),
-              ),
-              trailing,
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showOptions(Map<String, dynamic> f) {
-    showModalBottomSheet(
-      context: context,
+  PreferredSizeWidget _normalAppBar() {
+    return AppBar(
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.share, color: Colors.green),
-                title: const Text('مشاركة'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _tools.shareFile(f['path'], f['name']);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.edit, color: Colors.indigo),
-                title: const Text('إعادة تسمية'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final ctrl = TextEditingController(text: f['name']);
-                  final n = await showDialog<String>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24)),
-                      title: const Text('إعادة تسمية'),
-                      content: TextField(controller: ctrl),
-                      actions: [
-                        TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('إلغاء')),
-                        FilledButton(
-                            onPressed: () =>
-                                Navigator.pop(ctx, ctrl.text.trim()),
-                            child: const Text('حفظ')),
-                      ],
-                    ),
-                  );
-                  if (n != null && n.isNotEmpty) {
-                    await _db.updateFile(f['id'], {'name': n});
-                    _load();
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('حذف'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  try {
-                    await File(f['path']).delete();
-                  } catch (_) {}
-                  await _db.deleteFile(f['id']);
-                  _load();
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+      elevation: 0,
+      title: Text(widget.groupName),
+      actions: [
+        IconButton(icon: const Icon(Icons.upload_file), onPressed: _importPdfs),
+      ],
     );
   }
 
-  String _sizeText(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  PreferredSizeWidget _selectionAppBar() {
+    final primary = Theme.of(context).colorScheme.primary;
+    return AppBar(
+      backgroundColor: primary.withOpacity(0.08),
+      leading: IconButton(
+          icon: const Icon(Icons.close_rounded), onPressed: _clearSelection),
+      title: Text('${_selected.length} محدد',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      actions: [
+        IconButton(
+            icon: const Icon(Icons.label_rounded),
+            onPressed: _batchTag,
+            tooltip: 'وسم'),
+        IconButton(
+            icon: const Icon(Icons.drive_file_move_rounded),
+            onPressed: _batchMove,
+            tooltip: 'نقل'),
+        IconButton(
+            icon: const Icon(Icons.star_rounded, color: Colors.amber),
+            onPressed: _batchFavorite,
+            tooltip: 'مفضلة'),
+        IconButton(
+            icon: const Icon(Icons.delete_rounded, color: Colors.red),
+            onPressed: _batchDelete,
+            tooltip: 'حذف'),
+      ],
+    );
+  }
+
+  Future<void> _openFile(Map<String, dynamic> f) async {
+    await _db.markOpened(f['id']);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      pageRoute(PdfViewerScreen(filePath: f['path'], fileName: f['name'])),
+    );
+    _load();
   }
 }
