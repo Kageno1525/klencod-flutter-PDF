@@ -24,7 +24,6 @@ dependencies:
   qr_flutter: ^4.1.0
   archive: ^3.6.1
   printing: ^5.13.4
-  pdf_text: ^0.13.0
 
 dev_dependencies:
   flutter_test:

@@ -96,91 +96,35 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  // ══════════ Search inside PDF ══════════
-  Future<void> _searchText() async {
-    final ctrl = TextEditingController();
-    final query = await showDialog<String>(
+  // ══════════ Info about text search ══════════
+  void _showTextSearchInfo() {
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Row(
           children: [
-            Icon(Icons.search_rounded, color: Color(0xFF2563EB)),
+            Icon(Icons.search_off_rounded, color: Colors.orange),
             SizedBox(width: 8),
-            Text('بحث داخل PDF'),
+            Text('البحث داخل PDF'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'كلمة للبحث',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'يشتغل مع PDFs فيها نص حقيقي\n(مش الممسوحة ضوئيًا)',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-          ],
+        content: const Text(
+          'البحث داخل نص الـ PDF غير متاح حاليًا.\n\n'
+          'المكتبات المجانية المتاحة إما قديمة ومعطّلة (زي pdf_text) '
+          'أو غير مستقرة.\n\n'
+          'الحلول الممكنة:\n'
+          '• Syncfusion (مدفوع أو تسجيل Community)\n'
+          '• PDFTron (مدفوع)\n\n'
+          'لو حبيت نضيفها لاحقًا، هتحتاج تسجل Syncfusion Community License.',
+          style: TextStyle(fontSize: 13, height: 1.5),
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('إلغاء')),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            icon: const Icon(Icons.search_rounded, size: 18),
-            label: const Text('بحث'),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('حسناً'),
           ),
         ],
-      ),
-    );
-    if (query == null || query.isEmpty) return;
-
-    try {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('جاري البحث...')),
-      );
-      final pages =
-          await PdfToolsService.instance.searchInPdf(widget.filePath, query);
-      if (!mounted) return;
-      if (pages.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'لم يتم العثور على "$query"\n(قد يكون الملف صورة ممسوحة ضوئيًا)'),
-            duration: const Duration(seconds: 4),
-          ),
-        );
-        return;
-      }
-      _showSearchResults(query, pages);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ في البحث: $e')),
-      );
-    }
-  }
-
-  void _showSearchResults(String query, List<int> pages) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _SearchResultsSheet(
-        query: query,
-        pages: pages,
-        onJumpToPage: (pageNumber1Based) {
-          _pdfController?.setPage(pageNumber1Based - 1);
-        },
       ),
     );
   }
@@ -390,8 +334,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.search_rounded),
-            tooltip: 'بحث داخل PDF',
-            onPressed: _searchText,
+            tooltip: 'البحث داخل PDF',
+            onPressed: _showTextSearchInfo,
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded),
@@ -541,122 +485,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// SEARCH RESULTS
-// ═══════════════════════════════════════════════════════════════════
-
-class _SearchResultsSheet extends StatelessWidget {
-  final String query;
-  final List<int> pages; // 1-based
-  final void Function(int pageNumber1Based) onJumpToPage;
-
-  const _SearchResultsSheet({
-    required this.query,
-    required this.pages,
-    required this.onJumpToPage,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.7,
-      ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded,
-                      color: Color(0xFF2563EB)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'نتائج: "$query"',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2563EB).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${pages.length} صفحة',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2563EB),
-                          fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: pages.length,
-                itemBuilder: (ctx, i) {
-                  final pageNum = pages[i];
-                  return ListTile(
-                    dense: true,
-                    leading: CircleAvatar(
-                      radius: 16,
-                      backgroundColor:
-                          const Color(0xFF2563EB).withOpacity(0.15),
-                      child: Text(
-                        '$pageNum',
-                        style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2563EB)),
-                      ),
-                    ),
-                    title: Text(
-                      'الصفحة $pageNum',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.arrow_forward_rounded,
-                          size: 18),
-                      tooltip: 'اذهب',
-                      onPressed: () {
-                        Navigator.pop(context);
-                        onJumpToPage(pageNum);
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
         ),
       ),
     );

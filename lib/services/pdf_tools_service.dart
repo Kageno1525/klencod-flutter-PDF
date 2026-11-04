@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf_text/pdf_text.dart' as ptx;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
@@ -19,7 +18,6 @@ class PdfToolsService {
 
   final DatabaseService _db = DatabaseService.instance;
 
-  // جودة عالية للدمج/التقسيم
   static const int _rasterDpi = 200;
 
   Future<Directory> _pdfsDir() async {
@@ -243,52 +241,8 @@ class PdfToolsService {
     return File(outPath);
   }
 
-  // ══════════════════ Text Search (pdf_text) ══════════════════
-
-  /// يرجع أرقام الصفحات اللي فيها الكلمة (1-based).
-  /// بيرجع [] لو الـ PDF صورة ممسوحة ضوئيًا.
-  Future<List<int>> searchInPdf(String sourcePath, String query) async {
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) return [];
-
-    final doc = await ptx.PDFDoc.openFromPath(sourcePath);
-    final hits = <int>[];
-    try {
-      for (int i = 0; i < doc.length; i++) {
-        try {
-          final text = await doc.getText(page: i);
-          if (text.toLowerCase().contains(q)) hits.add(i + 1);
-        } catch (_) {}
-      }
-    } finally {
-      await doc.close();
-    }
-    return hits;
-  }
-
-  Future<String> extractAllText(String sourcePath) async {
-    final doc = await ptx.PDFDoc.openFromPath(sourcePath);
-    final buffer = StringBuffer();
-    try {
-      for (int i = 0; i < doc.length; i++) {
-        try {
-          final text = await doc.getText(page: i);
-          buffer.writeln('— صفحة ${i + 1} —');
-          buffer.writeln(text);
-          buffer.writeln();
-        } catch (e) {
-          buffer.writeln('[خطأ في قراءة الصفحة ${i + 1}]');
-        }
-      }
-    } finally {
-      await doc.close();
-    }
-    return buffer.toString();
-  }
-
   // ══════════════════ THUMBNAILS ══════════════════
 
-  /// يرجع صورة مصغّرة من الصفحة الأولى. الكاش بيتحفظ في مجلد thumbnails
   Future<File?> getThumbnail(String pdfPath, {int dpi = 100}) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
