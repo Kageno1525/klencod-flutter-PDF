@@ -11,7 +11,6 @@
     <application
         android:requestLegacyExternalStorage="true"
         android:label="PdF"
-        android:icon="@mipmap/ic_launcher"
         android:theme="@style/NormalTheme">
 
         <activity
