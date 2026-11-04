@@ -100,7 +100,6 @@ class PdfToolsService {
     final images = <Uint8List>[];
     await for (final page in Printing.raster(bytes, dpi: dpi.toDouble())) {
       images.add(await page.toPng());
-      await page.dispose();
     }
     return images;
   }
@@ -259,7 +258,6 @@ class PdfToolsService {
           in Printing.raster(bytes, dpi: dpi.toDouble(), pages: const [0])) {
         final png = await page.toPng();
         await thumbFile.writeAsBytes(png);
-        await page.dispose();
         return thumbFile;
       }
     } catch (_) {}
