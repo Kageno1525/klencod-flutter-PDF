@@ -11,10 +11,6 @@ import '../services/pdf_tools_service.dart';
 import 'group_screen.dart';
 import 'pdf_viewer_screen.dart';
 
-// ═══════════════════════════════════════════════════════════════════
-// SHELL
-// ═══════════════════════════════════════════════════════════════════
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -56,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final tp = context.watch<ThemeProvider>();
-    final theme = Theme.of(context);
     return Scaffold(
       extendBody: true,
       drawer: _buildDrawer(),
@@ -86,9 +81,8 @@ class _HomeScreenState extends State<HomeScreen> {
             refreshTick: _refreshTick,
             onOpenGroup: _openGroup,
             onOpenFile: _openFile,
-            onFileOptions: _openFileOptions,
-            onGroupOptions: _openGroupOptions,
-            onRefresh: _bumpRefresh,
+            onOpenFileOptions: _openFileOptions,
+            onOpenGroupOptions: _openGroupOptions,
           ),
           _FavoritesTab(
             refreshTick: _refreshTick,
@@ -284,7 +278,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ───────────── Actions ─────────────
   Future<void> _showAddMenu() async {
     showModalBottomSheet(
       context: context,
@@ -573,7 +566,6 @@ class _HomeTab extends StatefulWidget {
   final void Function(Map<String, dynamic>) onOpenGroup;
   final void Function(Map<String, dynamic>) onOpenFileOptions;
   final void Function(Map<String, dynamic>) onOpenGroupOptions;
-  final VoidCallback onRefresh;
 
   const _HomeTab({
     required this.refreshTick,
@@ -581,7 +573,6 @@ class _HomeTab extends StatefulWidget {
     required this.onOpenGroup,
     required this.onOpenFileOptions,
     required this.onOpenGroupOptions,
-    required this.onRefresh,
   });
 
   @override
@@ -861,7 +852,8 @@ class _FavoritesTabState extends State<_FavoritesTab> {
 
   Future<void> _load() async {
     if (mounted) setState(() => _loading = true);
-    final files = await _db.getFiles(favoritesOnly: true, sortBy: 'added_at DESC');
+    final files =
+        await _db.getFiles(favoritesOnly: true, sortBy: 'added_at DESC');
     if (!mounted) return;
     setState(() {
       _files = files;
@@ -1218,8 +1210,7 @@ class _SettingsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tp = context.watch<ThemeProvider>();
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return _AppBackground(
       child: ListView(
@@ -1472,8 +1463,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-          16, showTopPadding ? 20 : 0, 16, 12),
+      padding: EdgeInsets.fromLTRB(16, showTopPadding ? 20 : 0, 16, 12),
       child: Row(
         children: [
           Container(
@@ -2008,8 +1998,8 @@ class _FileOptionsSheet extends StatelessWidget {
     );
   }
 
-  Future<void> _rename(
-      BuildContext context, Map<String, dynamic> file, VoidCallback onDone) async {
+  Future<void> _rename(BuildContext context, Map<String, dynamic> file,
+      VoidCallback onDone) async {
     final ctrl = TextEditingController(text: file['name']);
     final newName = await showDialog<String>(
       context: context,
@@ -2034,8 +2024,8 @@ class _FileOptionsSheet extends StatelessWidget {
     }
   }
 
-  Future<void> _delete(
-      BuildContext context, Map<String, dynamic> file, VoidCallback onDone) async {
+  Future<void> _delete(BuildContext context, Map<String, dynamic> file,
+      VoidCallback onDone) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -2155,8 +2145,7 @@ class _GroupOptionsSheet extends StatelessWidget {
                         fontSize: 13, fontWeight: FontWeight.w600)),
                 onTap: () async {
                   Navigator.pop(context);
-                  final ctrl =
-                      TextEditingController(text: group['name']);
+                  final ctrl = TextEditingController(text: group['name']);
                   final n = await showDialog<String>(
                     context: context,
                     builder: (ctx) => AlertDialog(
@@ -2177,8 +2166,7 @@ class _GroupOptionsSheet extends StatelessWidget {
                     ),
                   );
                   if (n != null && n.isNotEmpty) {
-                    final db = DatabaseService.instance;
-                    final raw = await db.database;
+                    final raw = await DatabaseService.instance.database;
                     await raw.update('groups', {'name': n},
                         where: 'id = ?', whereArgs: [group['id']]);
                     onChanged();
