@@ -93,7 +93,6 @@ class PdfToolsService {
     final images = <Uint8List>[];
     await for (final page in Printing.raster(bytes, dpi: dpi.toDouble())) {
       images.add(await page.toPng());
-      await page.dispose();
     }
     return images;
   }
