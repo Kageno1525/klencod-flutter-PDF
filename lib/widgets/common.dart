@@ -13,7 +13,6 @@ import '../services/pdf_tools_service.dart';
 
 final ValueNotifier<int> selectedTabNotifier = ValueNotifier<int>(0);
 
-/// حجم الشبكة (px). يتغير بالزوم بالصبعين.
 final ValueNotifier<double> gridSizeNotifier = ValueNotifier<double>(150);
 const double kMinGridSize = 110.0;
 const double kMaxGridSize = 260.0;
@@ -567,7 +566,7 @@ class FolderGridItem extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// LIST-STYLE TILES (older widgets — kept for reuse in some places)
+// LIST-STYLE TILES
 // ═══════════════════════════════════════════════════════════════════
 
 class PartitionTile extends StatelessWidget {
@@ -1802,8 +1801,9 @@ Future<SavePdfResult?> showSavePdfDialog(
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════
 
-Route pageRoute(Widget page) {
-  return PageRouteBuilder(
+/// ✅ GENERIC — يقبل أي نوع نتيجة (List<File>, dynamic, إلخ)
+Route<T> pageRoute<T>(Widget page) {
+  return PageRouteBuilder<T>(
     pageBuilder: (_, __, ___) => page,
     transitionDuration: const Duration(milliseconds: 350),
     transitionsBuilder: (_, animation, __, child) {
