@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
+import 'widgets/common.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+  await loadViewMode();
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(prefs),
@@ -69,10 +71,7 @@ class PdfVaultApp extends StatelessWidget {
         indicatorColor: primary.withOpacity(0.15),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: primary);
+            return const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: primary);
           }
           return const TextStyle(fontSize: 10, fontWeight: FontWeight.w600);
         }),
@@ -91,22 +90,17 @@ class PdfVaultApp extends StatelessWidget {
       inputDecorationTheme: InputDecorationTheme(
         filled: false,
         border: InputBorder.none,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        hintStyle:
-            TextStyle(color: Colors.black.withOpacity(0.35), fontSize: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        hintStyle: TextStyle(color: Colors.black.withOpacity(0.35), fontSize: 14),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle:
-              const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
       ),
-      dividerTheme:
-          DividerThemeData(color: Colors.black.withOpacity(0.06), thickness: 1),
+      dividerTheme: DividerThemeData(color: Colors.black.withOpacity(0.06), thickness: 1),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: primary,
@@ -143,10 +137,7 @@ class PdfVaultApp extends StatelessWidget {
         indicatorColor: primary.withOpacity(0.2),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: primary);
+            return const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: primary);
           }
           return const TextStyle(fontSize: 10, fontWeight: FontWeight.w600);
         }),
@@ -165,22 +156,17 @@ class PdfVaultApp extends StatelessWidget {
       inputDecorationTheme: InputDecorationTheme(
         filled: false,
         border: InputBorder.none,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        hintStyle:
-            TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 14),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle:
-              const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
       ),
-      dividerTheme: DividerThemeData(
-          color: Colors.white.withOpacity(0.08), thickness: 1),
+      dividerTheme: DividerThemeData(color: Colors.white.withOpacity(0.08), thickness: 1),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: primary,

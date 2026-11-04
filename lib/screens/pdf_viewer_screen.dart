@@ -1,10 +1,10 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/database_service.dart';
 import '../services/pdf_tools_service.dart';
 import '../widgets/common.dart';
+import 'pdf_editor_screen.dart';
 
 class PdfViewerScreen extends StatefulWidget {
   final String filePath;
@@ -26,7 +26,19 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool _horizontal = false;
   PDFViewController? _pdfController;
 
-  // ══════════ Watermark ══════════
+  Future<void> _openEditor() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      pageRoute(PdfEditorScreen(
+        filePath: widget.filePath,
+        fileName: widget.fileName,
+      )),
+    );
+    if (changed == true && mounted) {
+      Navigator.pop(context, true);
+    }
+  }
+
   Future<void> _addWatermark() async {
     final ctrl = TextEditingController(text: 'مسودة');
     final text = await showDialog<String>(
@@ -67,8 +79,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       const SnackBar(content: Text('جاري التطبيق...')),
     );
     try {
-      final newFile =
-          await PdfToolsService.instance.addWatermark(widget.filePath, text);
+      final newFile = await PdfToolsService.instance
+          .addWatermark(widget.filePath, text);
       if (!mounted) return;
       final saveResult = await showSavePdfDialog(
         context,
@@ -96,40 +108,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  // ══════════ Info about text search ══════════
-  void _showTextSearchInfo() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Row(
-          children: [
-            Icon(Icons.search_off_rounded, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('البحث داخل PDF'),
-          ],
-        ),
-        content: const Text(
-          'البحث داخل نص الـ PDF غير متاح حاليًا.\n\n'
-          'المكتبات المجانية المتاحة إما قديمة ومعطّلة (زي pdf_text) '
-          'أو غير مستقرة.\n\n'
-          'الحلول الممكنة:\n'
-          '• Syncfusion (مدفوع أو تسجيل Community)\n'
-          '• PDFTron (مدفوع)\n\n'
-          'لو حبيت نضيفها لاحقًا، هتحتاج تسجل Syncfusion Community License.',
-          style: TextStyle(fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('حسناً'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ══════════ Delete page ══════════
   Future<void> _deleteCurrentPage() async {
     if (_totalPages == 0) return;
     final ok = await showDialog<bool>(
@@ -188,7 +166,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  // ══════════ Extract page as image ══════════
   Future<void> _extractPageAsImage() async {
     if (_totalPages == 0) return;
     try {
@@ -217,7 +194,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  // ══════════ Extract range ══════════
   Future<void> _extractRange() async {
     if (_totalPages == 0) return;
     final startCtrl = TextEditingController(text: '$_currentPage');
@@ -333,9 +309,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search_rounded),
-            tooltip: 'البحث داخل PDF',
-            onPressed: _showTextSearchInfo,
+            icon: const Icon(Icons.edit_note_rounded,
+                color: Color(0xFFDC2626)),
+            tooltip: 'محرر النص',
+            onPressed: _openEditor,
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded),

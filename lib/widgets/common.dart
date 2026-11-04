@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/database_service.dart';
 import '../services/pdf_tools_service.dart';
 
@@ -13,9 +14,54 @@ import '../services/pdf_tools_service.dart';
 
 final ValueNotifier<int> selectedTabNotifier = ValueNotifier<int>(0);
 
-final ValueNotifier<double> gridSizeNotifier = ValueNotifier<double>(150);
-const double kMinGridSize = 110.0;
-const double kMaxGridSize = 260.0;
+enum ViewMode { gridSmall, gridLarge, listCompact, listDetailed }
+
+final ValueNotifier<ViewMode> viewModeNotifier =
+    ValueNotifier<ViewMode>(ViewMode.gridSmall);
+
+Future<void> loadViewMode() async {
+  try {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString('viewMode');
+    if (s != null) {
+      viewModeNotifier.value = ViewMode.values.firstWhere(
+        (v) => v.name == s,
+        orElse: () => ViewMode.gridSmall,
+      );
+    }
+  } catch (_) {}
+}
+
+void setViewMode(ViewMode mode) {
+  viewModeNotifier.value = mode;
+  SharedPreferences.getInstance().then((p) => p.setString('viewMode', mode.name));
+}
+
+bool isGridMode(ViewMode m) =>
+    m == ViewMode.gridSmall || m == ViewMode.gridLarge;
+
+SliverGridDelegateWithMaxCrossAxisExtent gridDelegateForMode(ViewMode mode) {
+  switch (mode) {
+    case ViewMode.gridSmall:
+      return const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 130,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 0.82,
+      );
+    case ViewMode.gridLarge:
+      return const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 200,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.82,
+      );
+    default:
+      return const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 150,
+      );
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // APP BACKGROUND
@@ -50,8 +96,7 @@ class AppBackground extends StatelessWidget {
 class ThemeToggleButton extends StatelessWidget {
   final bool isDark;
   final VoidCallback onTap;
-  const ThemeToggleButton(
-      {super.key, required this.isDark, required this.onTap});
+  const ThemeToggleButton({super.key, required this.isDark, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +128,101 @@ class ThemeToggleButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VIEW MODE TOGGLE
+// ═══════════════════════════════════════════════════════════════════
+
+class ViewModeToggle extends StatelessWidget {
+  const ViewModeToggle({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.grid_view_rounded, size: 22),
+      tooltip: 'شكل العرض',
+      onPressed: () => _showPicker(context),
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ValueListenableBuilder<ViewMode>(
+        valueListenable: viewModeNotifier,
+        builder: (ctx, current, __) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          return Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text('شكل العرض',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                    _opt(ctx, ViewMode.gridSmall, Icons.grid_view_rounded,
+                        'شبكة صغيرة', current),
+                    _opt(ctx, ViewMode.gridLarge, Icons.apps_rounded,
+                        'شبكة كبيرة', current),
+                    _opt(ctx, ViewMode.listCompact, Icons.view_list_rounded,
+                        'قائمة', current),
+                    _opt(ctx, ViewMode.listDetailed, Icons.view_agenda_rounded,
+                        'قائمة مفصلة', current),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _opt(BuildContext ctx, ViewMode mode, IconData icon, String label,
+      ViewMode current) {
+    final selected = mode == current;
+    final primary = Theme.of(ctx).colorScheme.primary;
+    return ListTile(
+      leading: Icon(icon, color: selected ? primary : null),
+      title: Text(label,
+          style: TextStyle(
+              fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
+      trailing: selected
+          ? Icon(Icons.check_rounded, color: primary, size: 20)
+          : null,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      selected: selected,
+      selectedTileColor: primary.withOpacity(0.08),
+      onTap: () {
+        setViewMode(mode);
+        Navigator.pop(ctx);
+      },
     );
   }
 }
@@ -209,41 +349,7 @@ class SectionHeader extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// PINCH ZOOM WRAPPER
-// ═══════════════════════════════════════════════════════════════════
-
-class PinchZoomWrapper extends StatefulWidget {
-  final Widget child;
-  const PinchZoomWrapper({super.key, required this.child});
-
-  @override
-  State<PinchZoomWrapper> createState() => _PinchZoomWrapperState();
-}
-
-class _PinchZoomWrapperState extends State<PinchZoomWrapper> {
-  double _base = 150;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onScaleStart: (details) {
-        if (details.pointerCount >= 2) {
-          _base = gridSizeNotifier.value;
-        }
-      },
-      onScaleUpdate: (details) {
-        if (details.pointerCount >= 2) {
-          final newSize = _base * details.scale;
-          gridSizeNotifier.value = newSize.clamp(kMinGridSize, kMaxGridSize);
-        }
-      },
-      child: widget.child,
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// FILE GRID ITEM (with PDF thumbnail)
+// FILE GRID ITEM
 // ═══════════════════════════════════════════════════════════════════
 
 class FileGridItem extends StatefulWidget {
@@ -252,7 +358,6 @@ class FileGridItem extends StatefulWidget {
   final VoidCallback? onLongPress;
   final bool isSelected;
   final bool inSelectionMode;
-  final bool showOpenTime;
 
   const FileGridItem({
     super.key,
@@ -261,7 +366,6 @@ class FileGridItem extends StatefulWidget {
     this.onLongPress,
     this.isSelected = false,
     this.inSelectionMode = false,
-    this.showOpenTime = false,
   });
 
   @override
@@ -335,8 +439,8 @@ class _FileGridItemState extends State<FileGridItem> {
                   fit: StackFit.expand,
                   children: [
                     ClipRRect(
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(14)),
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(14)),
                       child: _loading
                           ? Container(
                               color: isDark
@@ -356,8 +460,7 @@ class _FileGridItemState extends State<FileGridItem> {
                                   _thumb!,
                                   fit: BoxFit.cover,
                                   cacheWidth: 400,
-                                  errorBuilder: (_, __, ___) =>
-                                      _placeholder(),
+                                  errorBuilder: (_, __, ___) => _placeholder(),
                                 )
                               : _placeholder(),
                     ),
@@ -460,6 +563,162 @@ class _FileGridItemState extends State<FileGridItem> {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// FILE DETAIL TILE (large list row)
+// ═══════════════════════════════════════════════════════════════════
+
+class FileDetailTile extends StatefulWidget {
+  final Map<String, dynamic> file;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final bool isSelected;
+  final bool inSelectionMode;
+
+  const FileDetailTile({
+    super.key,
+    required this.file,
+    required this.onTap,
+    this.onLongPress,
+    this.isSelected = false,
+    this.inSelectionMode = false,
+  });
+
+  @override
+  State<FileDetailTile> createState() => _FileDetailTileState();
+}
+
+class _FileDetailTileState extends State<FileDetailTile> {
+  File? _thumb;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final t = await PdfToolsService.instance
+        .getThumbnail(widget.file['path'] as String);
+    if (mounted) setState(() => _thumb = t);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+    final isFav = widget.file['is_favorite'] == 1;
+    final tagColor = widget.file['tag_color'] != null
+        ? Color(widget.file['tag_color'] as int)
+        : null;
+    final date = DateFormat('yyyy/MM/dd').format(
+        DateTime.fromMillisecondsSinceEpoch(widget.file['added_at'] as int));
+
+    return Material(
+      color: widget.isSelected
+          ? primary.withOpacity(0.1)
+          : (isDark ? const Color(0xFF1A1A2E) : Colors.white),
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: widget.isSelected
+                ? Border.all(color: primary, width: 2)
+                : null,
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              if (widget.inSelectionMode)
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Icon(
+                    widget.isSelected
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: widget.isSelected ? primary : Colors.grey,
+                    size: 24,
+                  ),
+                ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 60,
+                  height: 80,
+                  child: _thumb != null
+                      ? Image.file(_thumb!,
+                          fit: BoxFit.cover, cacheWidth: 200)
+                      : Container(
+                          color: isDark
+                              ? Colors.white.withOpacity(0.05)
+                              : Colors.black.withOpacity(0.05),
+                          child: const Center(
+                            child: Icon(Icons.picture_as_pdf_rounded,
+                                color: Color(0xFFDC2626), size: 30),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.file['name'],
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        if (tagColor != null) ...[
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                                color: tagColor, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(sizeText(widget.file['size'] as int),
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[600])),
+                        const SizedBox(width: 8),
+                        Text('·',
+                            style: TextStyle(color: Colors.grey[400])),
+                        const SizedBox(width: 8),
+                        Text(date,
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[600])),
+                        if (isFav) ...[
+                          const SizedBox(width: 6),
+                          const Icon(Icons.star_rounded,
+                              color: Colors.amber, size: 14),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (!widget.inSelectionMode)
+                Icon(Icons.chevron_right_rounded,
+                    color: Colors.grey.withOpacity(0.6)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // FOLDER GRID ITEM
 // ═══════════════════════════════════════════════════════════════════
 
@@ -484,7 +743,6 @@ class FolderGridItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Material(
       color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -566,150 +824,8 @@ class FolderGridItem extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// LIST-STYLE TILES
+// FILE TILE (compact list row)
 // ═══════════════════════════════════════════════════════════════════
-
-class PartitionTile extends StatelessWidget {
-  final Map<String, dynamic> partition;
-  final int foldersCount;
-  final int filesCount;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  const PartitionTile({
-    super.key,
-    required this.partition,
-    required this.foldersCount,
-    required this.filesCount,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        splashColor: Colors.transparent,
-        highlightColor:
-            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFDC2626), Color(0xFF2563EB)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.library_books_rounded,
-                    color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(partition['name'],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.folder_rounded,
-                            size: 13, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text('$foldersCount مجلد',
-                            style: const TextStyle(
-                                fontSize: 11, color: Colors.grey)),
-                        const SizedBox(width: 10),
-                        Icon(Icons.picture_as_pdf_rounded,
-                            size: 13, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text('$filesCount ملف',
-                            style: const TextStyle(
-                                fontSize: 11, color: Colors.grey)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded,
-                  color: Colors.grey.withOpacity(0.6)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class GroupTile extends StatelessWidget {
-  final Map<String, dynamic> group;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  const GroupTile({
-    super.key,
-    required this.group,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        splashColor: Colors.transparent,
-        highlightColor:
-            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          leading: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)]),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.folder_rounded,
-                color: Colors.white, size: 26),
-          ),
-          title: Text(group['name'],
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          subtitle: const Text('مجلد',
-              style: TextStyle(fontSize: 11, color: Colors.grey)),
-          trailing: Icon(Icons.chevron_right_rounded,
-              color: Colors.grey.withOpacity(0.6)),
-        ),
-      ),
-    );
-  }
-}
 
 class FileTile extends StatelessWidget {
   final Map<String, dynamic> file;
@@ -838,6 +954,287 @@ class FileTile extends StatelessWidget {
       ),
     );
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PARTITION TILE (list row for folder/partition)
+// ═══════════════════════════════════════════════════════════════════
+
+class PartitionTile extends StatelessWidget {
+  final Map<String, dynamic> partition;
+  final int foldersCount;
+  final int filesCount;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  const PartitionTile({
+    super.key,
+    required this.partition,
+    required this.foldersCount,
+    required this.filesCount,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        splashColor: Colors.transparent,
+        highlightColor:
+            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFDC2626), Color(0xFF2563EB)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.library_books_rounded,
+                    color: Colors.white, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(partition['name'],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.folder_rounded,
+                            size: 13, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text('$foldersCount مجلد',
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.grey)),
+                        const SizedBox(width: 10),
+                        Icon(Icons.picture_as_pdf_rounded,
+                            size: 13, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text('$filesCount ملف',
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.grey)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  color: Colors.grey.withOpacity(0.6)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MODE HELPERS
+// ═══════════════════════════════════════════════════════════════════
+
+Widget fileTileForMode({
+  required BuildContext context,
+  required Map<String, dynamic> file,
+  required ViewMode mode,
+  required VoidCallback onTap,
+  VoidCallback? onLongPress,
+  bool isSelected = false,
+  bool inSelectionMode = false,
+  bool showOpenTime = false,
+}) {
+  if (mode == ViewMode.listDetailed) {
+    return FileDetailTile(
+        file: file,
+        onTap: onTap,
+        onLongPress: onLongPress,
+        isSelected: isSelected,
+        inSelectionMode: inSelectionMode);
+  }
+  if (mode == ViewMode.listCompact) {
+    return FileTile(
+        file: file,
+        onTap: onTap,
+        onLongPress: onLongPress,
+        isSelected: isSelected,
+        inSelectionMode: inSelectionMode,
+        showOpenTime: showOpenTime);
+  }
+  return FileGridItem(
+      file: file,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      isSelected: isSelected,
+      inSelectionMode: inSelectionMode);
+}
+
+Widget folderTileForMode({
+  required BuildContext context,
+  required Map<String, dynamic> folder,
+  required ViewMode mode,
+  required VoidCallback onTap,
+  VoidCallback? onLongPress,
+  int? filesCount,
+  int? foldersCount,
+  bool isPartition = false,
+}) {
+  if (isGridMode(mode)) {
+    return FolderGridItem(
+      folder: folder,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      filesCount: filesCount,
+      foldersCount: foldersCount,
+      isPartition: isPartition,
+    );
+  }
+  return PartitionTile(
+    partition: folder,
+    foldersCount: foldersCount ?? 0,
+    filesCount: filesCount ?? 0,
+    onTap: onTap,
+    onLongPress: onLongPress,
+  );
+}
+
+Widget filesSliver({
+  required List<Map<String, dynamic>> files,
+  required ViewMode mode,
+  required Map<int, Map<String, dynamic>> selectedFiles,
+  required bool inSelectionMode,
+  required void Function(Map<String, dynamic>) onTap,
+  void Function(Map<String, dynamic>)? onLongPress,
+  bool showOpenTime = false,
+}) {
+  if (isGridMode(mode)) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      sliver: SliverGrid(
+        gridDelegate: gridDelegateForMode(mode),
+        delegate: SliverChildBuilderDelegate(
+          (c, i) {
+            final f = files[i];
+            return RepaintBoundary(
+              child: fileTileForMode(
+                context: c,
+                file: f,
+                mode: mode,
+                onTap: () => onTap(f),
+                onLongPress:
+                    onLongPress != null ? () => onLongPress(f) : null,
+                isSelected: selectedFiles.containsKey(f['id']),
+                inSelectionMode: inSelectionMode,
+                showOpenTime: showOpenTime,
+              ),
+            );
+          },
+          childCount: files.length,
+        ),
+      ),
+    );
+  }
+  return SliverPadding(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    sliver: SliverList.builder(
+      itemCount: files.length,
+      itemBuilder: (c, i) {
+        final f = files[i];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: RepaintBoundary(
+            child: fileTileForMode(
+              context: c,
+              file: f,
+              mode: mode,
+              onTap: () => onTap(f),
+              onLongPress: onLongPress != null ? () => onLongPress(f) : null,
+              isSelected: selectedFiles.containsKey(f['id']),
+              inSelectionMode: inSelectionMode,
+              showOpenTime: showOpenTime,
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+Widget buildFilesBox({
+  required List<Map<String, dynamic>> files,
+  required ViewMode mode,
+  required Map<int, Map<String, dynamic>> selectedFiles,
+  required bool inSelectionMode,
+  required void Function(Map<String, dynamic>) onTap,
+  void Function(Map<String, dynamic>)? onLongPress,
+  bool showOpenTime = false,
+}) {
+  if (isGridMode(mode)) {
+    return GridView.builder(
+      physics:
+          const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 120),
+      gridDelegate: gridDelegateForMode(mode),
+      itemCount: files.length,
+      itemBuilder: (c, i) {
+        final f = files[i];
+        return RepaintBoundary(
+          child: fileTileForMode(
+            context: c,
+            file: f,
+            mode: mode,
+            onTap: () => onTap(f),
+            onLongPress: onLongPress != null ? () => onLongPress(f) : null,
+            isSelected: selectedFiles.containsKey(f['id']),
+            inSelectionMode: inSelectionMode,
+            showOpenTime: showOpenTime,
+          ),
+        );
+      },
+    );
+  }
+  return ListView.builder(
+    physics:
+        const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+    padding: const EdgeInsets.fromLTRB(12, 16, 12, 120),
+    itemCount: files.length,
+    itemBuilder: (c, i) {
+      final f = files[i];
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: RepaintBoundary(
+          child: fileTileForMode(
+            context: c,
+            file: f,
+            mode: mode,
+            onTap: () => onTap(f),
+            onLongPress: onLongPress != null ? () => onLongPress(f) : null,
+            isSelected: selectedFiles.containsKey(f['id']),
+            inSelectionMode: inSelectionMode,
+            showOpenTime: showOpenTime,
+          ),
+        ),
+      );
+    },
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1801,7 +2198,6 @@ Future<SavePdfResult?> showSavePdfDialog(
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════
 
-/// ✅ GENERIC — يقبل أي نوع نتيجة (List<File>, dynamic, إلخ)
 Route<T> pageRoute<T>(Widget page) {
   return PageRouteBuilder<T>(
     pageBuilder: (_, __, ___) => page,
