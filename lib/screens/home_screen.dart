@@ -11,6 +11,10 @@ import '../services/pdf_tools_service.dart';
 import 'group_screen.dart';
 import 'pdf_viewer_screen.dart';
 
+// ═══════════════════════════════════════════════════════════════════
+// SHELL
+// ═══════════════════════════════════════════════════════════════════
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -84,14 +88,8 @@ class _HomeScreenState extends State<HomeScreen> {
             onOpenFileOptions: _openFileOptions,
             onOpenGroupOptions: _openGroupOptions,
           ),
-          _FavoritesTab(
-            refreshTick: _refreshTick,
-            onOpenFile: _openFile,
-          ),
-          _RecentTab(
-            refreshTick: _refreshTick,
-            onOpenFile: _openFile,
-          ),
+          _FavoritesTab(refreshTick: _refreshTick, onOpenFile: _openFile),
+          _RecentTab(refreshTick: _refreshTick, onOpenFile: _openFile),
           _ToolsTab(
             onImport: _importPdfs,
             onImagesToPdf: _imagesToPdf,
@@ -150,26 +148,22 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildFab() {
     return Material(
       color: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
         onTap: _showAddMenu,
+        splashColor: Colors.white.withOpacity(0.2),
+        highlightColor: Colors.transparent,
         child: Ink(
           width: 64,
           height: 64,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF7C3AED), Color(0xFFEC4899)],
+              colors: [Color(0xFFDC2626), Color(0xFF2563EB)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF7C3AED).withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
           ),
           child: const Icon(Icons.add_rounded, color: Colors.white, size: 32),
         ),
@@ -188,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF7C3AED), Color(0xFFEC4899)],
+                  colors: [Color(0xFFDC2626), Color(0xFF2563EB)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -375,8 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Text('مجموعة جديدة'),
         content: TextField(
           controller: ctrl,
@@ -490,9 +483,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openGroup(Map<String, dynamic> g) async {
     await Navigator.push(
       context,
-      _pageRoute(
-        GroupScreen(groupId: g['id'], groupName: g['name']),
-      ),
+      _pageRoute(GroupScreen(groupId: g['id'], groupName: g['name'])),
     );
     _bumpRefresh();
   }
@@ -502,10 +493,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _FileOptionsSheet(
-        file: f,
-        onChanged: _bumpRefresh,
-      ),
+      builder: (_) => _FileOptionsSheet(file: f, onChanged: _bumpRefresh),
     );
   }
 
@@ -514,10 +502,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _GroupOptionsSheet(
-        group: g,
-        onChanged: _bumpRefresh,
-      ),
+      builder: (_) => _GroupOptionsSheet(group: g, onChanged: _bumpRefresh),
     );
   }
 
@@ -528,7 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Row(
           children: [
-            Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF7C3AED)),
+            Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFDC2626)),
             SizedBox(width: 12),
             Text('PDF Vault'),
           ],
@@ -658,7 +643,7 @@ class _HomeTabState extends State<_HomeTab> {
                 child: _SectionHeader(
                   icon: Icons.picture_as_pdf_rounded,
                   title: _search.isEmpty ? 'الملفات' : 'نتائج البحث',
-                  color: const Color(0xFFEC4899),
+                  color: const Color(0xFFDC2626),
                   trailing: '${_files.length}',
                 ),
               ),
@@ -691,9 +676,8 @@ class _HomeTabState extends State<_HomeTab> {
               SliverToBoxAdapter(
                 child: _EmptyState(
                   icon: Icons.folder_open_rounded,
-                  title: _search.isEmpty
-                      ? 'لا توجد ملفات بعد'
-                      : 'لا توجد نتائج',
+                  title:
+                      _search.isEmpty ? 'لا توجد ملفات بعد' : 'لا توجد نتائج',
                   subtitle: _search.isEmpty
                       ? 'اضغط زر + لإضافة ملف أو مجموعة'
                       : 'جرّب كلمة بحث أخرى',
@@ -712,15 +696,14 @@ class _HomeTabState extends State<_HomeTab> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Container(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
+          color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.08)
+                : Colors.black.withOpacity(0.06),
+            width: 1,
+          ),
         ),
         child: TextField(
           controller: _searchCtrl,
@@ -763,53 +746,53 @@ class _HomeTabState extends State<_HomeTab> {
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (ctx, i) {
           final selected = _sortBy == sorts[i].$2;
-          final primary = Theme.of(context).colorScheme.primary;
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            decoration: BoxDecoration(
-              gradient: selected
-                  ? const LinearGradient(
-                      colors: [Color(0xFF7C3AED), Color(0xFFEC4899)])
-                  : null,
-              color: selected ? null : Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(20),
-              border: selected
-                  ? null
-                  : Border.all(
-                      color: Theme.of(context).dividerColor.withOpacity(0.2)),
-              boxShadow: selected
-                  ? [
-                      BoxShadow(
-                        color: primary.withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () {
-                  setState(() => _sortBy = sorts[i].$2);
-                  _load();
-                },
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Center(
-                    child: Text(
-                      sorts[i].$1,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: selected
-                            ? Colors.white
-                            : Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () {
+                setState(() => _sortBy = sorts[i].$2);
+                _load();
+              },
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                decoration: BoxDecoration(
+                  gradient: selected
+                      ? const LinearGradient(
+                          colors: [Color(0xFFDC2626), Color(0xFF2563EB)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        )
+                      : null,
+                  color: selected
+                      ? null
+                      : (isDark ? const Color(0xFF1A1A2E) : Colors.white),
+                  borderRadius: BorderRadius.circular(20),
+                  border: selected
+                      ? null
+                      : Border.all(
+                          color: isDark
+                              ? Colors.white.withOpacity(0.08)
+                              : Colors.black.withOpacity(0.06),
+                          width: 1,
+                        ),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                alignment: Alignment.center,
+                child: Text(
+                  sorts[i].$1,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: selected
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -956,7 +939,7 @@ class _RecentTabState extends State<_RecentTab> {
                         icon: Icons.history_rounded,
                         title: 'لا يوجد سجل بعد',
                         subtitle: 'افتح أي ملف PDF وسيظهر هنا',
-                        color: Color(0xFF06B6D4),
+                        color: Color(0xFF2563EB),
                       ),
                     ],
                   )
@@ -1012,7 +995,7 @@ class _ToolsTab extends StatelessWidget {
           const _SectionHeader(
             icon: Icons.handyman_rounded,
             title: 'أدوات الملفات',
-            color: Color(0xFF7C3AED),
+            color: Color(0xFFDC2626),
             showTopPadding: false,
           ),
           GridView.count(
@@ -1025,13 +1008,13 @@ class _ToolsTab extends StatelessWidget {
             children: [
               _ToolCard(
                 icon: Icons.upload_file_rounded,
-                colors: const [Color(0xFF7C3AED), Color(0xFF6366F1)],
+                colors: const [Color(0xFFDC2626), Color(0xFFEF4444)],
                 label: 'استيراد PDF',
                 onTap: onImport,
               ),
               _ToolCard(
                 icon: Icons.image_rounded,
-                colors: const [Color(0xFFEC4899), Color(0xFFEF4444)],
+                colors: const [Color(0xFF2563EB), Color(0xFF3B82F6)],
                 label: 'صور إلى PDF',
                 onTap: onImagesToPdf,
               ),
@@ -1043,7 +1026,7 @@ class _ToolsTab extends StatelessWidget {
               ),
               _ToolCard(
                 icon: Icons.backup_rounded,
-                colors: const [Color(0xFF06B6D4), Color(0xFF3B82F6)],
+                colors: const [Color(0xFF06B6D4), Color(0xFF2563EB)],
                 label: 'نسخة كاملة',
                 onTap: onBackupFull,
               ),
@@ -1055,7 +1038,7 @@ class _ToolsTab extends StatelessWidget {
               ),
               _ToolCard(
                 icon: Icons.restore_rounded,
-                colors: const [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+                colors: const [Color(0xFFDC2626), Color(0xFF2563EB)],
                 label: 'استعادة',
                 onTap: onRestore,
               ),
@@ -1095,22 +1078,15 @@ class _ToolCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: Colors.transparent,
+      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
         onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+        splashColor: Colors.transparent,
+        highlightColor:
+            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
+        child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1125,13 +1101,6 @@ class _ToolCard extends StatelessWidget {
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colors.first.withOpacity(0.4),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
                 ),
                 child: Icon(icon, color: Colors.white, size: 28),
               ),
@@ -1165,9 +1134,15 @@ class _ComingSoonItem extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: isDark
-              ? const Color(0xFF1E1B4B).withOpacity(0.5)
+              ? const Color(0xFF1A1A2E).withOpacity(0.5)
               : Colors.white.withOpacity(0.7),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.06)
+                : Colors.black.withOpacity(0.04),
+            width: 1,
+          ),
         ),
         child: ListTile(
           leading: Icon(icon, color: Colors.grey, size: 22),
@@ -1220,20 +1195,19 @@ class _SettingsTab extends StatelessWidget {
           const _SectionHeader(
             icon: Icons.palette_rounded,
             title: 'المظهر',
-            color: Color(0xFFEC4899),
+            color: Color(0xFFDC2626),
             showTopPadding: false,
           ),
           Container(
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
+              color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
               borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.black.withOpacity(0.06),
+                width: 1,
+              ),
             ),
             child: SwitchListTile(
               secondary: Container(
@@ -1243,7 +1217,7 @@ class _SettingsTab extends StatelessWidget {
                   gradient: LinearGradient(
                     colors: isDark
                         ? const [Color(0xFFFBBF24), Color(0xFFF97316)]
-                        : const [Color(0xFF7C3AED), Color(0xFFEC4899)],
+                        : const [Color(0xFFDC2626), Color(0xFF2563EB)],
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1267,27 +1241,26 @@ class _SettingsTab extends StatelessWidget {
           const _SectionHeader(
             icon: Icons.info_rounded,
             title: 'معلومات',
-            color: Color(0xFF06B6D4),
+            color: Color(0xFF2563EB),
             showTopPadding: false,
           ),
           Container(
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
+              color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
               borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.black.withOpacity(0.06),
+                width: 1,
+              ),
             ),
             child: Column(
               children: [
                 ListTile(
                   leading: const Icon(Icons.apps_rounded, size: 22),
-                  title: const Text('اسم التطبيق',
-                      style: TextStyle(fontSize: 13)),
+                  title:
+                      const Text('اسم التطبيق', style: TextStyle(fontSize: 13)),
                   trailing: const Text('PDF Vault',
                       style: TextStyle(
                           fontSize: 13, fontWeight: FontWeight.bold)),
@@ -1317,25 +1290,18 @@ class _SettingsTab extends StatelessWidget {
           const _SectionHeader(
             icon: Icons.favorite_rounded,
             title: 'عن التطبيق',
-            color: Color(0xFFEF4444),
+            color: Color(0xFFDC2626),
             showTopPadding: false,
           ),
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF7C3AED), Color(0xFFEC4899)],
+                colors: [Color(0xFFDC2626), Color(0xFF2563EB)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF7C3AED).withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1391,7 +1357,7 @@ class _AppBackground extends StatelessWidget {
           end: Alignment.bottomCenter,
           colors: isDark
               ? const [Color(0xFF0F0F1A), Color(0xFF1A1A2E)]
-              : const [Color(0xFFF5F3FF), Color(0xFFFCE7F3)],
+              : const [Color(0xFFFEF2F2), Color(0xFFEFF6FF)],
         ),
       ),
       child: child,
@@ -1408,9 +1374,12 @@ class _ThemeToggleButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
         onTap: onTap,
+        splashColor: Colors.white.withOpacity(0.2),
+        highlightColor: Colors.transparent,
         child: Ink(
           width: 44,
           height: 44,
@@ -1418,21 +1387,11 @@ class _ThemeToggleButton extends StatelessWidget {
             gradient: LinearGradient(
               colors: isDark
                   ? const [Color(0xFFFBBF24), Color(0xFFF97316)]
-                  : const [Color(0xFF7C3AED), Color(0xFFEC4899)],
+                  : const [Color(0xFFDC2626), Color(0xFF2563EB)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: (isDark
-                        ? const Color(0xFFFBBF24)
-                        : const Color(0xFF7C3AED))
-                    .withOpacity(0.35),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Icon(
             isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
@@ -1478,10 +1437,7 @@ class _SectionHeader extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
           const Spacer(),
           if (trailing != null)
@@ -1521,57 +1477,40 @@ class _GroupTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: Colors.transparent,
+      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         onLongPress: onLongPress,
-        child: Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+        splashColor: Colors.transparent,
+        highlightColor:
+            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
               ),
-            ],
-          ),
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            leading: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
-                ),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFF59E0B).withOpacity(0.35),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.folder_rounded,
-                  color: Colors.white, size: 26),
+              borderRadius: BorderRadius.circular(14),
             ),
-            title: Text(
-              group['name'],
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-            subtitle: const Text('مجموعة',
-                style: TextStyle(fontSize: 11, color: Colors.grey)),
-            trailing: Icon(Icons.chevron_right_rounded,
-                color: Colors.grey.withOpacity(0.6)),
+            child: const Icon(Icons.folder_rounded,
+                color: Colors.white, size: 26),
           ),
+          title: Text(
+            group['name'],
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+          subtitle: const Text('مجموعة',
+              style: TextStyle(fontSize: 11, color: Colors.grey)),
+          trailing: Icon(Icons.chevron_right_rounded,
+              color: Colors.grey.withOpacity(0.6)),
         ),
       ),
     );
@@ -1594,36 +1533,27 @@ class _FileTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final tagColor = file['tag_color'] != null
-        ? Color(file['tag_color'] as int)
-        : null;
+    final tagColor =
+        file['tag_color'] != null ? Color(file['tag_color'] as int) : null;
     final isFav = file['is_favorite'] == 1;
-    final when = showOpenTime
-        ? file['last_opened_at'] as int?
-        : file['added_at'] as int;
+    final when =
+        showOpenTime ? file['last_opened_at'] as int? : file['added_at'] as int;
     final dateStr = when != null
-        ? DateFormat('yyyy/MM/dd').format(
-            DateTime.fromMillisecondsSinceEpoch(when))
+        ? DateFormat('yyyy/MM/dd')
+            .format(DateTime.fromMillisecondsSinceEpoch(when))
         : '';
 
     return Material(
-      color: Colors.transparent,
+      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         onLongPress: onLongPress,
-        child: Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+        splashColor: Colors.transparent,
+        highlightColor:
+            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
+        child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
@@ -1632,16 +1562,9 @@ class _FileTile extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFEF4444), Color(0xFFEC4899)],
+                    colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
                   ),
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFEF4444).withOpacity(0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: const Icon(Icons.picture_as_pdf_rounded,
                     color: Colors.white, size: 24),
@@ -1729,8 +1652,8 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 20),
             Text(
               title,
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold),
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -1768,7 +1691,7 @@ class _AddMenuSheet extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
+        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: SafeArea(
@@ -1786,23 +1709,18 @@ class _AddMenuSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'إضافة جديد',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              const Text('إضافة جديد',
+                  style:
+                      TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
               _addOption(Icons.upload_file_rounded,
-                  const [Color(0xFF7C3AED), Color(0xFF6366F1)],
-                  'استيراد ملف PDF', onImport),
+                  const [Color(0xFFDC2626), Color(0xFFEF4444)], 'استيراد ملف PDF', onImport),
               _addOption(Icons.image_rounded,
-                  const [Color(0xFFEC4899), Color(0xFFEF4444)],
-                  'صور إلى PDF', onImages),
+                  const [Color(0xFF2563EB), Color(0xFF3B82F6)], 'صور إلى PDF', onImages),
               _addOption(Icons.camera_alt_rounded,
-                  const [Color(0xFFF59E0B), Color(0xFFEF4444)],
-                  'مسح بالكاميرا', onCamera),
+                  const [Color(0xFFF59E0B), Color(0xFFEF4444)], 'مسح بالكاميرا', onCamera),
               _addOption(Icons.create_new_folder_rounded,
-                  const [Color(0xFFFBBF24), Color(0xFFF59E0B)],
-                  'مجموعة جديدة', onGroup),
+                  const [Color(0xFFFBBF24), Color(0xFFF59E0B)], 'مجموعة جديدة', onGroup),
             ],
           ),
         ),
@@ -1816,9 +1734,12 @@ class _AddMenuSheet extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
         color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
           onTap: onTap,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.black.withOpacity(0.04),
           child: Padding(
             padding: const EdgeInsets.all(8),
             child: Row(
@@ -1870,7 +1791,7 @@ class _FileOptionsSheet extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
+        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: SafeArea(
@@ -1893,7 +1814,7 @@ class _FileOptionsSheet extends StatelessWidget {
                 child: Row(
                   children: [
                     const Icon(Icons.picture_as_pdf_rounded,
-                        color: Color(0xFFEF4444), size: 20),
+                        color: Color(0xFFDC2626), size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -2060,8 +1981,7 @@ class _FileOptionsSheet extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(file['name'],
-            maxLines: 2, overflow: TextOverflow.ellipsis),
+        title: Text(file['name'], maxLines: 2, overflow: TextOverflow.ellipsis),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -2098,7 +2018,7 @@ class _GroupOptionsSheet extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
+        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: SafeArea(
@@ -2158,8 +2078,7 @@ class _GroupOptionsSheet extends StatelessWidget {
                             onPressed: () => Navigator.pop(ctx),
                             child: const Text('إلغاء')),
                         FilledButton(
-                          onPressed: () =>
-                              Navigator.pop(ctx, ctrl.text.trim()),
+                          onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
                           child: const Text('حفظ'),
                         ),
                       ],
@@ -2175,8 +2094,8 @@ class _GroupOptionsSheet extends StatelessWidget {
               ),
               ListTile(
                 dense: true,
-                leading:
-                    const Icon(Icons.delete_rounded, color: Colors.red, size: 22),
+                leading: const Icon(Icons.delete_rounded,
+                    color: Colors.red, size: 22),
                 title: const Text('حذف المجموعة',
                     style: TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w600)),

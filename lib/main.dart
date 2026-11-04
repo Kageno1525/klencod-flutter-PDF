@@ -43,8 +43,8 @@ class PdfVaultApp extends StatelessWidget {
   }
 
   ThemeData _light() {
-    const primary = Color(0xFF7C3AED);
-    const secondary = Color(0xFFEC4899);
+    const primary = Color(0xFFDC2626); // أحمر
+    const secondary = Color(0xFF2563EB); // أزرق
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
       brightness: Brightness.light,
@@ -86,28 +86,27 @@ class PdfVaultApp extends StatelessWidget {
       cardTheme: CardThemeData(
         elevation: 0,
         color: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: false,
         border: InputBorder.none,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        hintStyle: TextStyle(
-            color: Colors.black.withOpacity(0.35), fontSize: 14),
+        hintStyle:
+            TextStyle(color: Colors.black.withOpacity(0.35), fontSize: 14),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle: const TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          textStyle:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
       ),
-      dividerTheme: DividerThemeData(
-          color: Colors.black.withOpacity(0.06), thickness: 1),
+      dividerTheme:
+          DividerThemeData(color: Colors.black.withOpacity(0.06), thickness: 1),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: primary,
@@ -118,8 +117,8 @@ class PdfVaultApp extends StatelessWidget {
   }
 
   ThemeData _dark() {
-    const primary = Color(0xFFA78BFA);
-    const secondary = Color(0xFFF472B6);
+    const primary = Color(0xFFF87171); // أحمر فاتح
+    const secondary = Color(0xFF60A5FA); // أزرق فاتح
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
       brightness: Brightness.dark,
@@ -140,7 +139,7 @@ class PdfVaultApp extends StatelessWidget {
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
         elevation: 0,
-        backgroundColor: const Color(0xFF1E1B4B),
+        backgroundColor: const Color(0xFF1A1A2E),
         indicatorColor: primary.withOpacity(0.2),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
@@ -160,25 +159,24 @@ class PdfVaultApp extends StatelessWidget {
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: const Color(0xFF1E1B4B),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        color: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: false,
         border: InputBorder.none,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        hintStyle: TextStyle(
-            color: Colors.white.withOpacity(0.35), fontSize: 14),
+        hintStyle:
+            TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 14),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle: const TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          textStyle:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
       ),
       dividerTheme: DividerThemeData(
