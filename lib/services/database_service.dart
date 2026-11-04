@@ -53,11 +53,14 @@ class DatabaseService {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           try {
-            await db.execute('ALTER TABLE files ADD COLUMN last_opened_at INTEGER;');
-            await db.execute('ALTER TABLE files ADD COLUMN is_favorite INTEGER DEFAULT 0;');
+            await db.execute(
+                'ALTER TABLE files ADD COLUMN last_opened_at INTEGER;');
+            await db.execute(
+                'ALTER TABLE files ADD COLUMN is_favorite INTEGER DEFAULT 0;');
             await db.execute('ALTER TABLE files ADD COLUMN tag_color INTEGER;');
             await db.execute('ALTER TABLE files ADD COLUMN tag_label TEXT;');
-            await db.execute('ALTER TABLE files ADD COLUMN auto_category TEXT;');
+            await db.execute(
+                'ALTER TABLE files ADD COLUMN auto_category TEXT;');
           } catch (_) {}
         }
       },
@@ -65,8 +68,7 @@ class DatabaseService {
     );
   }
 
-  // ══════════════ Groups (Partitions & Folders) ══════════════
-
+  // Groups
   Future<int> insertGroup(String name, {int? parentId}) async {
     final db = await database;
     return db.insert('groups', {
@@ -93,13 +95,15 @@ class DatabaseService {
 
   Future<Map<String, dynamic>?> getGroupById(int id) async {
     final db = await database;
-    final r = await db.query('groups', where: 'id = ?', whereArgs: [id], limit: 1);
+    final r = await db.query('groups',
+        where: 'id = ?', whereArgs: [id], limit: 1);
     return r.isEmpty ? null : r.first;
   }
 
   Future<void> updateGroup(int id, String newName) async {
     final db = await database;
-    await db.update('groups', {'name': newName}, where: 'id = ?', whereArgs: [id]);
+    await db.update('groups', {'name': newName},
+        where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> deleteGroup(int id) async {
@@ -109,21 +113,14 @@ class DatabaseService {
 
   Future<Map<String, int>> getGroupStats(int groupId) async {
     final db = await database;
-    final files = await db.query(
-      'files',
-      where: 'group_id = ?',
-      whereArgs: [groupId],
-    );
-    final folders = await db.query(
-      'groups',
-      where: 'parent_id = ?',
-      whereArgs: [groupId],
-    );
+    final files = await db.query('files',
+        where: 'group_id = ?', whereArgs: [groupId]);
+    final folders = await db.query('groups',
+        where: 'parent_id = ?', whereArgs: [groupId]);
     return {'files': files.length, 'folders': folders.length};
   }
 
-  // ══════════════ Files ══════════════
-
+  // Files
   Future<int> insertFile({
     required String name,
     required String path,
@@ -144,25 +141,25 @@ class DatabaseService {
 
   String _guessCategory(String fileName) {
     final lower = fileName.toLowerCase();
-    if (lower.contains('invoice') || lower.contains('فاتورة') || lower.contains('receipt')) {
-      return 'فواتير';
-    }
-    if (lower.contains('book') || lower.contains('كتاب') || lower.contains('course') || lower.contains('كورس')) {
-      return 'كتب وكورسات';
-    }
-    if (lower.contains('certificate') || lower.contains('شهادة') || lower.contains('cert')) {
-      return 'شهادات';
-    }
-    if (lower.contains('research') || lower.contains('بحث') || lower.contains('paper')) {
-      return 'بحوث';
-    }
+    if (lower.contains('invoice') ||
+        lower.contains('فاتورة') ||
+        lower.contains('receipt')) return 'فواتير';
+    if (lower.contains('book') ||
+        lower.contains('كتاب') ||
+        lower.contains('course') ||
+        lower.contains('كورس')) return 'كتب وكورسات';
+    if (lower.contains('certificate') ||
+        lower.contains('شهادة') ||
+        lower.contains('cert')) return 'شهادات';
+    if (lower.contains('research') ||
+        lower.contains('بحث') ||
+        lower.contains('paper')) return 'بحوث';
     return 'عام';
   }
 
   Future<List<Map<String, dynamic>>> getFiles({
     int? groupId,
     bool favoritesOnly = false,
-    String? autoCategory,
     bool allGroups = false,
     String sortBy = 'added_at DESC',
   }) async {
@@ -178,19 +175,11 @@ class DatabaseService {
       }
     }
     if (favoritesOnly) where.add('is_favorite = 1');
-    if (autoCategory != null &&
-        autoCategory.isNotEmpty &&
-        autoCategory != 'الكل') {
-      where.add('auto_category = ?');
-      args.add(autoCategory);
-    }
     final whereStr = where.isEmpty ? null : where.join(' AND ');
-    return db.query(
-      'files',
-      where: whereStr,
-      whereArgs: args.isEmpty ? null : args,
-      orderBy: sortBy,
-    );
+    return db.query('files',
+        where: whereStr,
+        whereArgs: args.isEmpty ? null : args,
+        orderBy: sortBy);
   }
 
   Future<List<Map<String, dynamic>>> getRecentFiles({int limit = 50}) async {
@@ -253,8 +242,7 @@ class DatabaseService {
     );
   }
 
-  // ══════════════ Backup ══════════════
-
+  // Backup
   Future<Directory> getBackupDirectory() async {
     try {
       final downloads = await getDownloadsDirectory();

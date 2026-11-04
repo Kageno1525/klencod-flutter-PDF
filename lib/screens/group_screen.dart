@@ -10,7 +10,8 @@ import 'pdf_viewer_screen.dart';
 class GroupScreen extends StatefulWidget {
   final int groupId;
   final String groupName;
-  const GroupScreen({super.key, required this.groupId, required this.groupName});
+  const GroupScreen(
+      {super.key, required this.groupId, required this.groupName});
 
   @override
   State<GroupScreen> createState() => _GroupScreenState();
@@ -60,14 +61,18 @@ class _GroupScreenState extends State<GroupScreen> {
 
   void _clearSelection() => setState(() => _selected.clear());
 
+  Future<void> _batchShare() async {
+    await batchShare(_selected.values.toList());
+    _clearSelection();
+  }
+
   Future<void> _batchDelete() async {
-    final count = _selected.length;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text('حذف $count ملف؟'),
-        content: const Text('هيتم حذفهم من التطبيق والجهاز نهائياً.'),
+        title: Text('حذف ${_selected.length} ملف؟'),
+        content: const Text('هيتم حذفهم نهائياً.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -155,11 +160,10 @@ class _GroupScreenState extends State<GroupScreen> {
       await File(f.path!).copy(dest);
       final stat = await File(dest).stat();
       await _db.insertFile(
-        name: f.name,
-        path: dest,
-        size: stat.size,
-        groupId: widget.groupId,
-      );
+          name: f.name,
+          path: dest,
+          size: stat.size,
+          groupId: widget.groupId);
     }
     _load();
   }
@@ -186,7 +190,8 @@ class _GroupScreenState extends State<GroupScreen> {
                             const SizedBox(width: 6),
                             const Text('المجلدات',
                                 style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 14)),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14)),
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -218,8 +223,7 @@ class _GroupScreenState extends State<GroupScreen> {
                                   );
                                   _load();
                                 },
-                                onLongPress: () =>
-                                    _showGroupOptions(g),
+                                onLongPress: () => _showGroupOptions(g),
                               ),
                             )),
                         const SizedBox(height: 16),
@@ -232,7 +236,8 @@ class _GroupScreenState extends State<GroupScreen> {
                             const SizedBox(width: 6),
                             const Text('الملفات',
                                 style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 14)),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14)),
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -283,17 +288,17 @@ class _GroupScreenState extends State<GroupScreen> {
                           child: EmptyState(
                             icon: Icons.folder_open_rounded,
                             title: 'هذا القسم فارغ',
-                            subtitle:
-                                'اضغط زر + لإضافة مجلد جديد، أو زر الرفع لإضافة ملفات',
+                            subtitle: 'اضغط زر + لإضافة مجلد أو ارفع PDF',
                             color: Color(0xFFF59E0B),
                           ),
                         ),
-                      const SizedBox(height: 120),
+                      const SizedBox(height: 160),
                     ],
                   ),
                 ),
         ),
       ),
+      bottomNavigationBar: const MainBottomBar(currentTab: 1),
       floatingActionButton: _inSelectionMode
           ? null
           : FloatingActionButton(
@@ -310,9 +315,7 @@ class _GroupScreenState extends State<GroupScreen> {
       title: Text(widget.groupName),
       actions: [
         IconButton(
-            icon: const Icon(Icons.upload_file),
-            onPressed: _importPdfs,
-            tooltip: 'إضافة PDF'),
+            icon: const Icon(Icons.upload_file), onPressed: _importPdfs),
       ],
     );
   }
@@ -326,6 +329,10 @@ class _GroupScreenState extends State<GroupScreen> {
       title: Text('${_selected.length} محدد',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       actions: [
+        IconButton(
+            icon: const Icon(Icons.share_rounded, color: Colors.green),
+            onPressed: _batchShare,
+            tooltip: 'مشاركة'),
         IconButton(
             icon: const Icon(Icons.label_rounded),
             onPressed: _batchTag,

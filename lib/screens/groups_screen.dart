@@ -4,7 +4,13 @@ import '../widgets/common.dart';
 import 'group_screen.dart';
 
 class GroupsScreen extends StatefulWidget {
-  const GroupsScreen({super.key});
+  final int refreshTick;
+  final VoidCallback onChanged;
+  const GroupsScreen({
+    super.key,
+    required this.refreshTick,
+    required this.onChanged,
+  });
 
   @override
   State<GroupsScreen> createState() => _GroupsScreenState();
@@ -19,6 +25,12 @@ class _GroupsScreenState extends State<GroupsScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(GroupsScreen old) {
+    super.didUpdateWidget(old);
+    if (widget.refreshTick != old.refreshTick) _load();
   }
 
   Future<void> _load() async {
@@ -61,90 +73,88 @@ class _GroupsScreenState extends State<GroupsScreen> {
     if (name != null && name.isNotEmpty) {
       await _db.insertGroup(name);
       _load();
+      widget.onChanged();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('المجموعات',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
-      body: AppBackground(
-        child: SafeArea(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: _partitions.isEmpty
-                      ? ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          children: const [
-                            SizedBox(height: 80),
-                            EmptyState(
-                              icon: Icons.library_books_outlined,
-                              title: 'لا توجد أقسام بعد',
-                              subtitle:
-                                  'اضغط زر + لإنشاء قسم جديد\nثم ضع فيه مجلدات وملفات',
-                              color: Color(0xFFDC2626),
-                            ),
-                          ],
-                        )
-                      : ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(
-                              parent: BouncingScrollPhysics()),
-                          padding:
-                              const EdgeInsets.fromLTRB(16, 16, 16, 120),
-                          itemCount: _partitions.length,
-                          itemBuilder: (ctx, i) {
-                            final entry = _partitions[i];
-                            final p = entry.key;
-                            final stats = entry.value;
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: RepaintBoundary(
-                                child: PartitionTile(
-                                  partition: p,
-                                  foldersCount: stats['folders'] ?? 0,
-                                  filesCount: stats['files'] ?? 0,
-                                  onTap: () async {
-                                    await Navigator.push(
-                                      context,
-                                      pageRoute(GroupScreen(
-                                        groupId: p['id'],
-                                        groupName: p['name'],
-                                      )),
-                                    );
-                                    _load();
-                                  },
-                                  onLongPress: () => _showPartitionOptions(p),
-                                ),
+    return AppBackground(
+      child: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: _load,
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _partitions.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: const [
+                          SizedBox(height: 80),
+                          EmptyState(
+                            icon: Icons.library_books_outlined,
+                            title: 'لا توجد أقسام بعد',
+                            subtitle:
+                                'اضغط زر + لإنشاء قسم\nثم ضع فيه مجلدات وملفات',
+                            color: Color(0xFFDC2626),
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics()),
+                        padding:
+                            const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                        itemCount: _partitions.length,
+                        itemBuilder: (ctx, i) {
+                          final entry = _partitions[i];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: RepaintBoundary(
+                              child: PartitionTile(
+                                partition: entry.key,
+                                foldersCount: entry.value['folders'] ?? 0,
+                                filesCount: entry.value['files'] ?? 0,
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    pageRoute(GroupScreen(
+                                      groupId: entry.key['id'],
+                                      groupName: entry.key['name'],
+                                    )),
+                                  );
+                                  _load();
+                                  widget.onChanged();
+                                },
+                                onLongPress: () => _showOptions(entry.key),
                               ),
-                            );
-                          },
-                        ),
-                ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createPartition,
-        child: const Icon(Icons.add_rounded),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+          Positioned(
+            right: 16,
+            bottom: 100,
+            child: FloatingActionButton(
+              heroTag: 'groups_fab',
+              onPressed: _createPartition,
+              child: const Icon(Icons.add_rounded),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  void _showPartitionOptions(Map<String, dynamic> p) {
+  void _showOptions(Map<String, dynamic> p) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => GroupOptionsSheet(
-        group: p,
-        onChanged: _load,
-      ),
+      builder: (_) => GroupOptionsSheet(group: p, onChanged: () {
+        _load();
+        widget.onChanged();
+      }),
     );
   }
 }

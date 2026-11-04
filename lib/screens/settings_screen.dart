@@ -27,36 +27,32 @@ class SettingsScreen extends StatelessWidget {
               color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.black.withOpacity(0.06),
-                width: 1,
-              ),
+                  color: isDark
+                      ? Colors.white.withOpacity(0.08)
+                      : Colors.black.withOpacity(0.06)),
             ),
             child: SwitchListTile(
               secondary: Container(
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isDark
-                        ? const [Color(0xFFFBBF24), Color(0xFFF97316)]
-                        : const [Color(0xFFDC2626), Color(0xFF2563EB)],
-                  ),
+                  gradient: LinearGradient(colors: isDark
+                      ? const [Color(0xFFFBBF24), Color(0xFFF97316)]
+                      : const [Color(0xFFDC2626), Color(0xFF2563EB)]),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                    isDark
+                        ? Icons.light_mode_rounded
+                        : Icons.dark_mode_rounded,
+                    color: Colors.white,
+                    size: 20),
               ),
               title: const Text('الوضع الداكن',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: Text(
-                tp.isDark ? 'مُفعّل' : 'معطّل',
-                style: const TextStyle(fontSize: 12),
-              ),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: Text(tp.isDark ? 'مُفعّل' : 'معطّل',
+                  style: const TextStyle(fontSize: 12)),
               value: tp.isDark,
               onChanged: (_) => tp.toggleTheme(),
             ),
@@ -73,11 +69,9 @@ class SettingsScreen extends StatelessWidget {
               color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.black.withOpacity(0.06),
-                width: 1,
-              ),
+                  color: isDark
+                      ? Colors.white.withOpacity(0.08)
+                      : Colors.black.withOpacity(0.06)),
             ),
             child: Column(
               children: [
@@ -92,7 +86,8 @@ class SettingsScreen extends StatelessWidget {
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 const ListTile(
                   leading: Icon(Icons.numbers_rounded, size: 22),
-                  title: Text('الإصدار', style: TextStyle(fontSize: 13)),
+                  title:
+                      Text('الإصدار', style: TextStyle(fontSize: 13)),
                   trailing: Text('1.0.0',
                       style: TextStyle(
                           fontSize: 13, fontWeight: FontWeight.bold)),
@@ -102,10 +97,8 @@ class SettingsScreen extends StatelessWidget {
                   leading: const Icon(Icons.storage_rounded, size: 22),
                   title: const Text('مكان النسخ الاحتياطية',
                       style: TextStyle(fontSize: 13)),
-                  subtitle: const Text(
-                    'Downloads/PdfVault',
-                    style: TextStyle(fontSize: 11),
-                  ),
+                  subtitle: const Text('Downloads/PdfVault',
+                      style: TextStyle(fontSize: 11)),
                 ),
               ],
             ),
@@ -130,29 +123,21 @@ class SettingsScreen extends StatelessWidget {
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.picture_as_pdf_rounded,
-                        color: Colors.white, size: 32),
-                    SizedBox(width: 12),
-                    Text(
-                      'PDF Vault',
+                Row(children: [
+                  Icon(Icons.picture_as_pdf_rounded,
+                      color: Colors.white, size: 32),
+                  SizedBox(width: 12),
+                  Text('PDF Vault',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold)),
+                ]),
                 SizedBox(height: 12),
                 Text(
-                  'مستودعك الشخصي لملفات PDF\nمع مجموعات متداخلة، بحث ذكي، وأدوات احترافية.',
+                  'مستودعك الشخصي لملفات PDF\nمع أقسام ومجلدات متداخلة، بحث، وأدوات احترافية.',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    height: 1.6,
-                  ),
+                      color: Colors.white, fontSize: 12, height: 1.6),
                 ),
               ],
             ),

@@ -43,8 +43,8 @@ class PdfVaultApp extends StatelessWidget {
   }
 
   ThemeData _light() {
-    const primary = Color(0xFFDC2626); // أحمر
-    const secondary = Color(0xFF2563EB); // أزرق
+    const primary = Color(0xFFDC2626);
+    const secondary = Color(0xFF2563EB);
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
       brightness: Brightness.light,
@@ -70,17 +70,17 @@ class PdfVaultApp extends StatelessWidget {
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: primary);
           }
-          return const TextStyle(fontSize: 11, fontWeight: FontWeight.w600);
+          return const TextStyle(fontSize: 10, fontWeight: FontWeight.w600);
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: primary, size: 26);
+            return const IconThemeData(color: primary, size: 24);
           }
-          return const IconThemeData(size: 24);
+          return const IconThemeData(size: 22);
         }),
       ),
       cardTheme: CardThemeData(
@@ -117,8 +117,8 @@ class PdfVaultApp extends StatelessWidget {
   }
 
   ThemeData _dark() {
-    const primary = Color(0xFFF87171); // أحمر فاتح
-    const secondary = Color(0xFF60A5FA); // أزرق فاتح
+    const primary = Color(0xFFF87171);
+    const secondary = Color(0xFF60A5FA);
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
       brightness: Brightness.dark,
@@ -144,17 +144,17 @@ class PdfVaultApp extends StatelessWidget {
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: primary);
           }
-          return const TextStyle(fontSize: 11, fontWeight: FontWeight.w600);
+          return const TextStyle(fontSize: 10, fontWeight: FontWeight.w600);
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: primary, size: 26);
+            return const IconThemeData(color: primary, size: 24);
           }
-          return const IconThemeData(size: 24);
+          return const IconThemeData(size: 22);
         }),
       ),
       cardTheme: CardThemeData(

@@ -5,6 +5,8 @@ class ToolsScreen extends StatelessWidget {
   final VoidCallback onImport;
   final VoidCallback onImagesToPdf;
   final VoidCallback onCameraScan;
+  final VoidCallback onMergePdfs;
+  final VoidCallback onSplitPdf;
   final VoidCallback onBackupFull;
   final VoidCallback onBackupDb;
   final VoidCallback onRestore;
@@ -14,6 +16,8 @@ class ToolsScreen extends StatelessWidget {
     required this.onImport,
     required this.onImagesToPdf,
     required this.onCameraScan,
+    required this.onMergePdfs,
+    required this.onSplitPdf,
     required this.onBackupFull,
     required this.onBackupDb,
     required this.onRestore,
@@ -24,11 +28,11 @@ class ToolsScreen extends StatelessWidget {
     return AppBackground(
       child: ListView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 160),
         children: [
           const SectionHeader(
-            icon: Icons.handyman_rounded,
-            title: 'أدوات الملفات',
+            icon: Icons.picture_as_pdf_rounded,
+            title: 'أدوات PDF',
             color: Color(0xFFDC2626),
             showTopPadding: false,
           ),
@@ -41,14 +45,26 @@ class ToolsScreen extends StatelessWidget {
             childAspectRatio: 1.05,
             children: [
               _ToolCard(
-                icon: Icons.upload_file_rounded,
+                icon: Icons.merge_type_rounded,
                 colors: const [Color(0xFFDC2626), Color(0xFFEF4444)],
+                label: 'دمج ملفات PDF',
+                onTap: onMergePdfs,
+              ),
+              _ToolCard(
+                icon: Icons.content_cut_rounded,
+                colors: const [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                label: 'تقسيم PDF',
+                onTap: onSplitPdf,
+              ),
+              _ToolCard(
+                icon: Icons.upload_file_rounded,
+                colors: const [Color(0xFF7C3AED), Color(0xFF6366F1)],
                 label: 'استيراد PDF',
                 onTap: onImport,
               ),
               _ToolCard(
                 icon: Icons.image_rounded,
-                colors: const [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                colors: const [Color(0xFFEC4899), Color(0xFFEF4444)],
                 label: 'صور إلى PDF',
                 onTap: onImagesToPdf,
               ),
@@ -58,6 +74,23 @@ class ToolsScreen extends StatelessWidget {
                 label: 'مسح بالكاميرا',
                 onTap: onCameraScan,
               ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const SectionHeader(
+            icon: Icons.backup_rounded,
+            title: 'النسخ الاحتياطي',
+            color: Color(0xFF06B6D4),
+            showTopPadding: false,
+          ),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.05,
+            children: [
               _ToolCard(
                 icon: Icons.backup_rounded,
                 colors: const [Color(0xFF06B6D4), Color(0xFF2563EB)],
@@ -78,18 +111,6 @@ class ToolsScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          const SectionHeader(
-            icon: Icons.hourglass_top_rounded,
-            title: 'قريباً',
-            color: Colors.grey,
-            showTopPadding: false,
-          ),
-          _ComingSoonItem(icon: Icons.merge_type_rounded, label: 'دمج ملفات PDF'),
-          _ComingSoonItem(icon: Icons.content_cut_rounded, label: 'تقسيم PDF'),
-          _ComingSoonItem(icon: Icons.text_fields_rounded, label: 'علامة مائية'),
-          _ComingSoonItem(icon: Icons.search_rounded, label: 'البحث داخل PDF'),
-          _ComingSoonItem(icon: Icons.print_rounded, label: 'طباعة مباشرة'),
         ],
       ),
     );
@@ -130,78 +151,19 @@ class _ToolCard extends StatelessWidget {
                 height: 56,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: colors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                      colors: colors,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(icon, color: Colors.white, size: 28),
               ),
               const SizedBox(height: 12),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              Text(label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.bold)),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ComingSoonItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _ComingSoonItem({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark
-              ? const Color(0xFF1A1A2E).withOpacity(0.5)
-              : Colors.white.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.06)
-                : Colors.black.withOpacity(0.04),
-            width: 1,
-          ),
-        ),
-        child: ListTile(
-          leading: const Icon(Icons.hourglass_top, color: Colors.grey, size: 22),
-          title: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'قريباً',
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
           ),
         ),
       ),

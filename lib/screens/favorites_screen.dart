@@ -81,7 +81,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       EmptyState(
                         icon: Icons.star_outline_rounded,
                         title: 'لا توجد ملفات مفضلة',
-                        subtitle: 'اضغط مطولاً على أي ملف لإضافته للمفضلة',
+                        subtitle:
+                            'اضغط مطولاً على أي ملف لإضافته للمفضلة',
                         color: Colors.amber,
                       ),
                     ],

@@ -1,5 +1,5 @@
-name: pdf_vault
-description: A professional PDF vault with nested groups, search, and themes.
+name: pdf
+description: A professional PDF vault.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -23,6 +23,7 @@ dependencies:
   pdf: ^3.11.1
   qr_flutter: ^4.1.0
   archive: ^3.6.1
+  printing: ^5.13.4
 
 dev_dependencies:
   flutter_test:

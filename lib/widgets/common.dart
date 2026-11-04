@@ -3,8 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/database_service.dart';
 import '../services/pdf_tools_service.dart';
+
+// ═══════════════════════════════════════════════════════════════════
+// GLOBAL TAB NOTIFIER
+// ═══════════════════════════════════════════════════════════════════
+
+final ValueNotifier<int> selectedTabNotifier = ValueNotifier<int>(0);
 
 // ═══════════════════════════════════════════════════════════════════
 // APP BACKGROUND
@@ -39,7 +46,8 @@ class AppBackground extends StatelessWidget {
 class ThemeToggleButton extends StatelessWidget {
   final bool isDark;
   final VoidCallback onTap;
-  const ThemeToggleButton({super.key, required this.isDark, required this.onTap});
+  const ThemeToggleButton(
+      {super.key, required this.isDark, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +76,68 @@ class ThemeToggleButton extends StatelessWidget {
             isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
             color: Colors.white,
             size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MAIN BOTTOM BAR (6 tabs)
+// ═══════════════════════════════════════════════════════════════════
+
+class MainBottomBar extends StatelessWidget {
+  final int currentTab;
+  const MainBottomBar({super.key, required this.currentTab});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: NavigationBar(
+            selectedIndex: currentTab,
+            onDestinationSelected: (i) {
+              final nav = Navigator.of(context);
+              if (nav.canPop()) nav.popUntil((r) => r.isFirst);
+              if (i != currentTab) selectedTabNotifier.value = i;
+            },
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.picture_as_pdf_outlined),
+                selectedIcon: Icon(Icons.picture_as_pdf_rounded),
+                label: 'الملفات',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.library_books_outlined),
+                selectedIcon: Icon(Icons.library_books_rounded),
+                label: 'المجموعات',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.star_outline_rounded),
+                selectedIcon: Icon(Icons.star_rounded),
+                label: 'المفضلة',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.history_rounded),
+                selectedIcon: Icon(Icons.history_rounded),
+                label: 'الأخيرة',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.handyman_outlined),
+                selectedIcon: Icon(Icons.handyman_rounded),
+                label: 'أدوات',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings_rounded),
+                label: 'الإعدادات',
+              ),
+            ],
           ),
         ),
       ),
@@ -111,10 +181,9 @@ class SectionHeader extends StatelessWidget {
             child: Icon(icon, color: color, size: 18),
           ),
           const SizedBox(width: 12),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-          ),
+          Text(title,
+              style:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
           const Spacer(),
           if (trailing != null)
             Container(
@@ -123,14 +192,11 @@ class SectionHeader extends StatelessWidget {
                 color: color.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Text(
-                trailing!,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
+              child: Text(trailing!,
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: color)),
             ),
         ],
       ),
@@ -139,7 +205,7 @@ class SectionHeader extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// PARTITION TILE (القسم)
+// PARTITION TILE
 // ═══════════════════════════════════════════════════════════════════
 
 class PartitionTile extends StatelessWidget {
@@ -233,7 +299,7 @@ class PartitionTile extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// FOLDER TILE (مجلد جوا قسم)
+// GROUP TILE (folder)
 // ═══════════════════════════════════════════════════════════════════
 
 class GroupTile extends StatelessWidget {
@@ -269,19 +335,17 @@ class GroupTile extends StatelessWidget {
             height: 48,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
-              ),
+                  colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)]),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Icon(Icons.folder_rounded,
                 color: Colors.white, size: 26),
           ),
-          title: Text(
-            group['name'],
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          ),
+          title: Text(group['name'],
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           subtitle: const Text('مجلد',
               style: TextStyle(fontSize: 11, color: Colors.grey)),
           trailing: Icon(Icons.chevron_right_rounded,
@@ -366,8 +430,7 @@ class FileTile extends StatelessWidget {
                   height: 48,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
-                    ),
+                        colors: [Color(0xFFDC2626), Color(0xFFEF4444)]),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(Icons.picture_as_pdf_rounded,
@@ -457,23 +520,18 @@ class EmptyState extends StatelessWidget {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: c.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
+                  color: c.withOpacity(0.12), shape: BoxShape.circle),
               child: Icon(icon, size: 50, color: c),
             ),
             const SizedBox(height: 20),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center),
             const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
+            Text(subtitle,
+                style: const TextStyle(color: Colors.grey, fontSize: 13),
+                textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -566,20 +624,18 @@ class AddMenuSheet extends StatelessWidget {
                   height: 48,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: colors,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                        colors: colors,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(icon, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Text(label,
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.bold)),
-                ),
+                    child: Text(label,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold))),
                 Icon(Icons.arrow_forward_ios_rounded,
                     size: 14, color: Colors.grey.withOpacity(0.5)),
               ],
@@ -599,11 +655,8 @@ class FileOptionsSheet extends StatelessWidget {
   final Map<String, dynamic> file;
   final VoidCallback onChanged;
 
-  const FileOptionsSheet({
-    super.key,
-    required this.file,
-    required this.onChanged,
-  });
+  const FileOptionsSheet(
+      {super.key, required this.file, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -640,13 +693,11 @@ class FileOptionsSheet extends StatelessWidget {
                         color: Color(0xFFDC2626), size: 20),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        file['name'],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
+                      child: Text(file['name'],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 14)),
                     ),
                   ],
                 ),
@@ -666,15 +717,13 @@ class FileOptionsSheet extends StatelessWidget {
                 Navigator.pop(context);
                 final color = await pickTagColor(context);
                 if (color != null) {
-                  await db.updateFile(
-                    file['id'],
-                    {'tag_color': color.value, 'tag_label': 'وسم'},
-                  );
+                  await db.updateFile(file['id'],
+                      {'tag_color': color.value, 'tag_label': 'وسم'});
                   onChanged();
                 }
               }),
-              _opt(Icons.drive_file_move_rounded, Colors.orange,
-                  'نقل إلى...', () async {
+              _opt(Icons.drive_file_move_rounded, Colors.orange, 'نقل إلى...',
+                  () async {
                 Navigator.pop(context);
                 final target = await pickGroup(context, title: 'نقل إلى...');
                 if (target == null) return;
@@ -732,9 +781,8 @@ class FileOptionsSheet extends StatelessWidget {
           TextButton(
               onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('حفظ'),
-          ),
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('حفظ')),
         ],
       ),
     );
@@ -781,7 +829,8 @@ class FileOptionsSheet extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(file['name'], maxLines: 2, overflow: TextOverflow.ellipsis),
+        title: Text(file['name'],
+            maxLines: 2, overflow: TextOverflow.ellipsis),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -795,11 +844,9 @@ class FileOptionsSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'يحتوي هذا الـ QR على بيانات الملف فقط',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: Colors.grey),
-            ),
+            const Text('يحتوي هذا الـ QR على بيانات الملف فقط',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: Colors.grey)),
           ],
         ),
       ),
@@ -815,11 +862,8 @@ class GroupOptionsSheet extends StatelessWidget {
   final Map<String, dynamic> group;
   final VoidCallback onChanged;
 
-  const GroupOptionsSheet({
-    super.key,
-    required this.group,
-    required this.onChanged,
-  });
+  const GroupOptionsSheet(
+      {super.key, required this.group, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -852,13 +896,11 @@ class GroupOptionsSheet extends StatelessWidget {
                         color: Colors.amber, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        group['name'],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
+                      child: Text(group['name'],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 14)),
                     ),
                   ],
                 ),
@@ -886,15 +928,15 @@ class GroupOptionsSheet extends StatelessWidget {
                             onPressed: () => Navigator.pop(ctx),
                             child: const Text('إلغاء')),
                         FilledButton(
-                          onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-                          child: const Text('حفظ'),
-                        ),
+                            onPressed: () =>
+                                Navigator.pop(ctx, ctrl.text.trim()),
+                            child: const Text('حفظ')),
                       ],
                     ),
                   );
                   if (n != null && n.isNotEmpty) {
-                    await DatabaseService.instance.updateGroup(
-                        group['id'] as int, n);
+                    await DatabaseService.instance
+                        .updateGroup(group['id'] as int, n);
                     onChanged();
                   }
                 },
@@ -920,11 +962,10 @@ class GroupOptionsSheet extends StatelessWidget {
                             onPressed: () => Navigator.pop(ctx, false),
                             child: const Text('إلغاء')),
                         FilledButton(
-                          style: FilledButton.styleFrom(
-                              backgroundColor: Colors.red),
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('حذف'),
-                        ),
+                            style: FilledButton.styleFrom(
+                                backgroundColor: Colors.red),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('حذف')),
                       ],
                     ),
                   );
@@ -1002,13 +1043,11 @@ class FileInfoSheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      file['name'],
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
+                    child: Text(file['name'],
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15)),
                   ),
                 ],
               ),
@@ -1018,17 +1057,15 @@ class FileInfoSheet extends StatelessWidget {
                 context,
                 'تاريخ الإضافة',
                 DateFormat('yyyy/MM/dd HH:mm').format(
-                  DateTime.fromMillisecondsSinceEpoch(file['added_at']),
-                ),
+                    DateTime.fromMillisecondsSinceEpoch(file['added_at'])),
               ),
               if (file['last_opened_at'] != null)
                 _row(
                   context,
                   'آخر فتح',
                   DateFormat('yyyy/MM/dd HH:mm').format(
-                    DateTime.fromMillisecondsSinceEpoch(
-                        file['last_opened_at']),
-                  ),
+                      DateTime.fromMillisecondsSinceEpoch(
+                          file['last_opened_at'])),
                 ),
               if (file['tag_color'] != null)
                 _row(context, 'الوسم', file['tag_label'] ?? 'وسم ملون',
@@ -1055,8 +1092,8 @@ class FileInfoSheet extends StatelessWidget {
                             ClipboardData(text: file['path']));
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('تم نسخ المسار')),
-                          );
+                              const SnackBar(
+                                  content: Text('تم نسخ المسار')));
                         }
                       },
                       icon: const Icon(Icons.copy_rounded, size: 18),
@@ -1099,20 +1136,17 @@ class FileInfoSheet extends StatelessWidget {
           ],
           SizedBox(
             width: 100,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[isDark ? 400 : 600],
-              ),
-            ),
+            child: Text(label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[isDark ? 400 : 600],
+                )),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            ),
+            child: Text(value,
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -1124,7 +1158,6 @@ class FileInfoSheet extends StatelessWidget {
 // PICKERS
 // ═══════════════════════════════════════════════════════════════════
 
-/// Returns `-1` for root, `id` for a group, `null` if user cancelled.
 Future<int?> pickGroup(BuildContext context,
     {String? title, bool showRoot = true}) async {
   final db = DatabaseService.instance;
@@ -1157,11 +1190,9 @@ Future<int?> pickGroup(BuildContext context,
         child: flat.isEmpty
             ? const Padding(
                 padding: EdgeInsets.all(16),
-                child: Text(
-                  'لا توجد أقسام بعد.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
+                child: Text('لا توجد أقسام بعد.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
               )
             : ListView(
                 shrinkWrap: true,
@@ -1177,11 +1208,9 @@ Future<int?> pickGroup(BuildContext context,
                             color: e.value == 0 ? Colors.red : Colors.amber,
                             size: 20,
                           ),
-                          title: Text(
-                            e.key['name'],
-                            style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
+                          title: Text(e.key['name'],
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w600)),
                           onTap: () =>
                               Navigator.pop(ctx, e.key['id'] as int),
                         ))
@@ -1272,9 +1301,21 @@ Future<void> batchMove(
 Future<void> batchTag(List<Map<String, dynamic>> files, Color color) async {
   final db = DatabaseService.instance;
   for (final f in files) {
-    await db.updateFile(f['id'] as int,
-        {'tag_color': color.value, 'tag_label': 'وسم'});
+    await db.updateFile(
+        f['id'] as int, {'tag_color': color.value, 'tag_label': 'وسم'});
   }
+}
+
+Future<void> batchShare(List<Map<String, dynamic>> files) async {
+  if (files.isEmpty) return;
+  final xfiles = files
+      .map((f) => XFile(f['path'] as String, name: f['name'] as String))
+      .toList();
+  await Share.shareXFiles(
+    xfiles,
+    subject:
+        files.length == 1 ? files.first['name'] as String : '${files.length} ملفات PDF',
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════
