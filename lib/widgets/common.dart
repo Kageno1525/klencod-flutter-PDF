@@ -8,10 +8,15 @@ import '../services/database_service.dart';
 import '../services/pdf_tools_service.dart';
 
 // ═══════════════════════════════════════════════════════════════════
-// GLOBAL TAB NOTIFIER
+// GLOBAL STATE
 // ═══════════════════════════════════════════════════════════════════
 
 final ValueNotifier<int> selectedTabNotifier = ValueNotifier<int>(0);
+
+/// حجم الشبكة (px). يتغير بالزوم بالصبعين.
+final ValueNotifier<double> gridSizeNotifier = ValueNotifier<double>(150);
+const double kMinGridSize = 110.0;
+const double kMaxGridSize = 260.0;
 
 // ═══════════════════════════════════════════════════════════════════
 // APP BACKGROUND
@@ -84,7 +89,7 @@ class ThemeToggleButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// MAIN BOTTOM BAR (6 tabs)
+// MAIN BOTTOM BAR
 // ═══════════════════════════════════════════════════════════════════
 
 class MainBottomBar extends StatelessWidget {
@@ -205,7 +210,364 @@ class SectionHeader extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// PARTITION TILE
+// PINCH ZOOM WRAPPER
+// ═══════════════════════════════════════════════════════════════════
+
+class PinchZoomWrapper extends StatefulWidget {
+  final Widget child;
+  const PinchZoomWrapper({super.key, required this.child});
+
+  @override
+  State<PinchZoomWrapper> createState() => _PinchZoomWrapperState();
+}
+
+class _PinchZoomWrapperState extends State<PinchZoomWrapper> {
+  double _base = 150;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onScaleStart: (details) {
+        if (details.pointerCount >= 2) {
+          _base = gridSizeNotifier.value;
+        }
+      },
+      onScaleUpdate: (details) {
+        if (details.pointerCount >= 2) {
+          final newSize = _base * details.scale;
+          gridSizeNotifier.value = newSize.clamp(kMinGridSize, kMaxGridSize);
+        }
+      },
+      child: widget.child,
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FILE GRID ITEM (with PDF thumbnail)
+// ═══════════════════════════════════════════════════════════════════
+
+class FileGridItem extends StatefulWidget {
+  final Map<String, dynamic> file;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final bool isSelected;
+  final bool inSelectionMode;
+  final bool showOpenTime;
+
+  const FileGridItem({
+    super.key,
+    required this.file,
+    required this.onTap,
+    this.onLongPress,
+    this.isSelected = false,
+    this.inSelectionMode = false,
+    this.showOpenTime = false,
+  });
+
+  @override
+  State<FileGridItem> createState() => _FileGridItemState();
+}
+
+class _FileGridItemState extends State<FileGridItem> {
+  File? _thumb;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(FileGridItem old) {
+    super.didUpdateWidget(old);
+    if (old.file['path'] != widget.file['path']) _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final t = await PdfToolsService.instance
+        .getThumbnail(widget.file['path'] as String);
+    if (mounted) {
+      setState(() {
+        _thumb = t;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+    final isFav = widget.file['is_favorite'] == 1;
+    final tagColor = widget.file['tag_color'] != null
+        ? Color(widget.file['tag_color'] as int)
+        : null;
+
+    return Material(
+      color: widget.isSelected
+          ? primary.withOpacity(0.1)
+          : (isDark ? const Color(0xFF1A1A2E) : Colors.white),
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: widget.isSelected
+                ? Border.all(color: primary, width: 2)
+                : Border.all(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.06)
+                        : Colors.black.withOpacity(0.05),
+                  ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ClipRRect(
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(14)),
+                      child: _loading
+                          ? Container(
+                              color: isDark
+                                  ? Colors.white.withOpacity(0.05)
+                                  : Colors.black.withOpacity(0.03),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                ),
+                              ),
+                            )
+                          : _thumb != null
+                              ? Image.file(
+                                  _thumb!,
+                                  fit: BoxFit.cover,
+                                  cacheWidth: 400,
+                                  errorBuilder: (_, __, ___) =>
+                                      _placeholder(),
+                                )
+                              : _placeholder(),
+                    ),
+                    if (widget.isSelected)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: primary,
+                            shape: BoxShape.circle,
+                            border:
+                                Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          child: const Icon(Icons.check_rounded,
+                              size: 14, color: Colors.white),
+                        ),
+                      )
+                    else if (isFav)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.amber,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.star_rounded,
+                              size: 12, color: Colors.white),
+                        ),
+                      ),
+                    if (tagColor != null)
+                      Positioned(
+                        top: 6,
+                        left: 6,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: tagColor,
+                            shape: BoxShape.circle,
+                            border:
+                                Border.all(color: Colors.white, width: 1.5),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.file['name'],
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          height: 1.25),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      sizeText(widget.file['size'] as int),
+                      style: TextStyle(fontSize: 9, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFDC2626).withOpacity(0.25),
+            const Color(0xFF2563EB).withOpacity(0.25),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Icon(Icons.picture_as_pdf_rounded,
+            size: 40, color: Color(0xFFDC2626)),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FOLDER GRID ITEM
+// ═══════════════════════════════════════════════════════════════════
+
+class FolderGridItem extends StatelessWidget {
+  final Map<String, dynamic> folder;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final int? filesCount;
+  final int? foldersCount;
+  final bool isPartition;
+
+  const FolderGridItem({
+    super.key,
+    required this.folder,
+    required this.onTap,
+    this.onLongPress,
+    this.filesCount,
+    this.foldersCount,
+    this.isPartition = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Material(
+      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withOpacity(0.06)
+                  : Colors.black.withOpacity(0.05),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: isPartition
+                        ? const LinearGradient(
+                            colors: [Color(0xFFDC2626), Color(0xFF2563EB)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : const LinearGradient(
+                            colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      isPartition
+                          ? Icons.library_books_rounded
+                          : Icons.folder_rounded,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      folder['name'],
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          height: 1.25),
+                    ),
+                    if (filesCount != null || foldersCount != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${foldersCount ?? 0} 📁 · ${filesCount ?? 0} 📄',
+                        style: TextStyle(fontSize: 9, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LIST-STYLE TILES (older widgets — kept for reuse in some places)
 // ═══════════════════════════════════════════════════════════════════
 
 class PartitionTile extends StatelessWidget {
@@ -260,13 +622,11 @@ class PartitionTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      partition['name'],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
+                    Text(partition['name'],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15)),
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -297,10 +657,6 @@ class PartitionTile extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// GROUP TILE (folder)
-// ═══════════════════════════════════════════════════════════════════
 
 class GroupTile extends StatelessWidget {
   final Map<String, dynamic> group;
@@ -355,10 +711,6 @@ class GroupTile extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// FILE TILE
-// ═══════════════════════════════════════════════════════════════════
 
 class FileTile extends StatelessWidget {
   final Map<String, dynamic> file;
@@ -1313,8 +1665,136 @@ Future<void> batchShare(List<Map<String, dynamic>> files) async {
       .toList();
   await Share.shareXFiles(
     xfiles,
-    subject:
-        files.length == 1 ? files.first['name'] as String : '${files.length} ملفات PDF',
+    subject: files.length == 1
+        ? files.first['name'] as String
+        : '${files.length} ملفات PDF',
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SAVE PDF DIALOG
+// ═══════════════════════════════════════════════════════════════════
+
+class SavePdfResult {
+  final String name;
+  final int? groupId;
+  const SavePdfResult({required this.name, this.groupId});
+}
+
+Future<SavePdfResult?> showSavePdfDialog(
+  BuildContext context, {
+  String defaultName = '',
+  int? defaultGroupId,
+}) async {
+  final nameCtrl = TextEditingController(text: defaultName);
+  int? groupId = defaultGroupId;
+
+  return showDialog<SavePdfResult>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setState) {
+        final db = DatabaseService.instance;
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
+            children: [
+              Icon(Icons.save_rounded, color: Color(0xFFDC2626)),
+              SizedBox(width: 8),
+              Text('حفظ ملف PDF'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'اسم الملف',
+                  hintText: 'مثال: تقرير_2024',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.picture_as_pdf_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () async {
+                  final target = await pickGroup(ctx,
+                      title: 'اختر المجلد', showRoot: true);
+                  if (target != null) {
+                    setState(() => groupId = target == -1 ? null : target);
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.withOpacity(0.4)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.folder_rounded,
+                          color: Colors.amber, size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FutureBuilder<Map<String, dynamic>?>(
+                          future: groupId != null
+                              ? db.getGroupById(groupId!)
+                              : Future.value(null),
+                          builder: (c, snap) {
+                            final name = groupId == null
+                                ? 'بدون مجلد'
+                                : (snap.data?['name'] ?? '...');
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('المجلد',
+                                    style: TextStyle(
+                                        fontSize: 10, color: Colors.grey)),
+                                Text(name,
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold)),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: Colors.grey),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('اكتب اسم للملف')),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx,
+                    SavePdfResult(name: name, groupId: groupId));
+              },
+              icon: const Icon(Icons.check_rounded, size: 18),
+              label: const Text('حفظ'),
+            ),
+          ],
+        );
+      },
+    ),
   );
 }
 

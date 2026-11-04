@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import '../main.dart';
@@ -10,6 +11,7 @@ import '../widgets/common.dart';
 import 'favorites_screen.dart';
 import 'groups_screen.dart';
 import 'pdf_viewer_screen.dart';
+import 'photo_review_screen.dart';
 import 'recent_screen.dart';
 import 'settings_screen.dart';
 import 'tools_screen.dart';
@@ -497,15 +499,34 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _imagesToPdf() async {
+    final picker = ImagePicker();
+    final images = await picker.pickMultiImage();
+    if (images.isEmpty) return;
+
+    if (!mounted) return;
+    final saveResult = await showSavePdfDialog(
+      context,
+      defaultName: 'صور_${DateTime.now().millisecondsSinceEpoch}',
+    );
+    if (saveResult == null) return;
+
     try {
-      final id = await _tools.importImagesAsPdf(context);
-      if (id != null) {
-        _bumpRefresh();
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم إنشاء PDF من الصور')),
-        );
-      }
+      final path = await _tools.imagesToPdf(
+        images,
+        baseName: saveResult.name,
+      );
+      final stat = await File(path).stat();
+      await _db.insertFile(
+        name: saveResult.name,
+        path: path,
+        size: stat.size,
+        groupId: saveResult.groupId,
+      );
+      _bumpRefresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم إنشاء PDF من الصور')),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -514,13 +535,67 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _cameraScan() async {
+    final picker = ImagePicker();
+    final files = <File>[];
+
+    while (true) {
+      final photo = await picker.pickImage(
+          source: ImageSource.camera, imageQuality: 90);
+      if (photo == null) break;
+      files.add(File(photo.path));
+      if (!mounted) return;
+      final more = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('صورة أخرى؟'),
+          content: Text('التقطت ${files.length} صورة. تضيف صورة؟'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('لا، خلاص')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('نعم')),
+          ],
+        ),
+      );
+      if (more != true) break;
+    }
+    if (files.isEmpty) return;
+
+    if (!mounted) return;
+    final reviewed = await Navigator.push<List<File>>(
+      context,
+      pageRoute(PhotoReviewScreen(photos: files)),
+    );
+    if (reviewed == null || reviewed.isEmpty) return;
+
+    if (!mounted) return;
+    final saveResult = await showSavePdfDialog(
+      context,
+      defaultName: 'مسح_${DateTime.now().millisecondsSinceEpoch}',
+    );
+    if (saveResult == null) return;
+
     try {
-      final path = await _tools.scanFromCamera();
-      if (path == null) return;
+      final path = await _tools.imagesToPdf(
+        reviewed.map((f) => XFile(f.path)).toList(),
+        baseName: saveResult.name,
+      );
       final stat = await File(path).stat();
       await _db.insertFile(
-          name: path.split('/').last, path: path, size: stat.size);
+        name: saveResult.name,
+        path: path,
+        size: stat.size,
+        groupId: saveResult.groupId,
+      );
       _bumpRefresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم حفظ ${reviewed.length} صور في PDF')),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -548,16 +623,27 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList();
     if (paths.length < 2) return;
 
+    if (!mounted) return;
+    final saveResult = await showSavePdfDialog(
+      context,
+      defaultName: 'مدموج_${DateTime.now().millisecondsSinceEpoch}',
+    );
+    if (saveResult == null) return;
+
     try {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('جاري الدمج...')),
       );
-      final file = await _tools.mergePdfs(paths,
-          baseName: 'merged_${DateTime.now().millisecondsSinceEpoch}');
+      final file =
+          await _tools.mergePdfs(paths, baseName: saveResult.name);
       final stat = await file.stat();
       await _db.insertFile(
-          name: file.path.split('/').last, path: file.path, size: stat.size);
+        name: saveResult.name,
+        path: file.path,
+        size: stat.size,
+        groupId: saveResult.groupId,
+      );
       _bumpRefresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -565,7 +651,7 @@ class _HomeScreenState extends State<HomeScreen> {
           content: Text('تم دمج ${paths.length} ملفات'),
           action: SnackBarAction(
             label: 'مشاركة',
-            onPressed: () => _tools.shareFile(file.path, 'merged.pdf'),
+            onPressed: () => _tools.shareFile(file.path, saveResult.name),
           ),
         ),
       );
@@ -593,26 +679,37 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (range == null) return;
 
+    if (!mounted) return;
+    final saveResult = await showSavePdfDialog(
+      context,
+      defaultName: 'مستخرج_${range['start']}_${range['end']}',
+    );
+    if (saveResult == null) return;
+
     try {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('جاري التقسيم...')),
+        const SnackBar(content: Text('جاري الاستخراج...')),
       );
       final file = await _tools.extractRange(
           path, range['start']!, range['end']!,
-          baseName: 'split_${DateTime.now().millisecondsSinceEpoch}');
+          baseName: saveResult.name);
       final stat = await file.stat();
       await _db.insertFile(
-          name: file.path.split('/').last, path: file.path, size: stat.size);
+        name: saveResult.name,
+        path: file.path,
+        size: stat.size,
+        groupId: saveResult.groupId,
+      );
       _bumpRefresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text('تم استخراج الصفحات ${range['start']}-${range['end']}'),
+          content: Text(
+              'تم استخراج الصفحات ${range['start']}-${range['end']}'),
           action: SnackBarAction(
             label: 'مشاركة',
-            onPressed: () => _tools.shareFile(file.path, 'split.pdf'),
+            onPressed: () => _tools.shareFile(file.path, saveResult.name),
           ),
         ),
       );
@@ -788,7 +885,7 @@ class _SplitDialogState extends State<_SplitDialog> {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// HOME TAB
+// HOME TAB (GRID + ZOOM)
 // ═══════════════════════════════════════════════════════════════════
 
 class HomeTab extends StatefulWidget {
@@ -851,80 +948,96 @@ class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     return AppBackground(
-      child: RefreshIndicator(
-        onRefresh: _load,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics()),
-          slivers: [
-            SliverToBoxAdapter(child: _buildSearch()),
-            SliverToBoxAdapter(child: _buildSortChips()),
-            if (_files.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: SectionHeader(
-                  icon: Icons.picture_as_pdf_rounded,
-                  title: _search.isEmpty ? 'كل الملفات' : 'نتائج البحث',
-                  color: const Color(0xFFDC2626),
-                  trailing: '${_files.length}',
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverList.builder(
-                  itemCount: _files.length,
-                  itemBuilder: (ctx, i) {
-                    final f = _files[i];
-                    final isSel = widget.selectedFiles.containsKey(f['id']);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: RepaintBoundary(
-                        child: FileTile(
-                          file: f,
-                          isSelected: isSel,
-                          inSelectionMode: _inSelectionMode,
-                          onTap: () {
-                            if (_inSelectionMode) {
-                              widget.onToggleSelection(f);
-                            } else {
-                              _openFile(f);
-                            }
+      child: ValueListenableBuilder<double>(
+        valueListenable: gridSizeNotifier,
+        builder: (_, gridSize, __) {
+          return PinchZoomWrapper(
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics()),
+                slivers: [
+                  SliverToBoxAdapter(child: _buildSearch()),
+                  SliverToBoxAdapter(child: _buildSortChips()),
+                  if (_files.isNotEmpty) ...[
+                    SliverToBoxAdapter(
+                      child: SectionHeader(
+                        icon: Icons.picture_as_pdf_rounded,
+                        title:
+                            _search.isEmpty ? 'كل الملفات' : 'نتائج البحث',
+                        color: const Color(0xFFDC2626),
+                        trailing: '${_files.length}',
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: gridSize,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 0.82,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (ctx, i) {
+                            final f = _files[i];
+                            final isSel =
+                                widget.selectedFiles.containsKey(f['id']);
+                            return RepaintBoundary(
+                              child: FileGridItem(
+                                file: f,
+                                isSelected: isSel,
+                                inSelectionMode: _inSelectionMode,
+                                onTap: () {
+                                  if (_inSelectionMode) {
+                                    widget.onToggleSelection(f);
+                                  } else {
+                                    _openFile(f);
+                                  }
+                                },
+                                onLongPress: () {
+                                  if (!_inSelectionMode) {
+                                    widget.onEnterSelection(f);
+                                  } else {
+                                    widget.onToggleSelection(f);
+                                  }
+                                },
+                              ),
+                            );
                           },
-                          onLongPress: () {
-                            if (!_inSelectionMode) {
-                              widget.onEnterSelection(f);
-                            } else {
-                              widget.onToggleSelection(f);
-                            }
-                          },
+                          childCount: _files.length,
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  ],
+                  if (_loading)
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    ),
+                  if (!_loading && _files.isEmpty)
+                    SliverToBoxAdapter(
+                      child: EmptyState(
+                        icon: Icons.picture_as_pdf_outlined,
+                        title: _search.isEmpty
+                            ? 'لا توجد ملفات بعد'
+                            : 'لا توجد نتائج',
+                        subtitle: _search.isEmpty
+                            ? 'اضغط زر + لاستيراد ملف PDF'
+                            : 'جرّب كلمة بحث أخرى',
+                        color: const Color(0xFFDC2626),
+                      ),
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                ],
               ),
-            ],
-            if (_loading)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 40),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              ),
-            if (!_loading && _files.isEmpty)
-              SliverToBoxAdapter(
-                child: EmptyState(
-                  icon: Icons.picture_as_pdf_outlined,
-                  title:
-                      _search.isEmpty ? 'لا توجد ملفات بعد' : 'لا توجد نتائج',
-                  subtitle: _search.isEmpty
-                      ? 'اضغط زر + لاستيراد ملف PDF'
-                      : 'جرّب كلمة بحث أخرى',
-                  color: const Color(0xFFDC2626),
-                ),
-              ),
-            const SliverToBoxAdapter(child: SizedBox(height: 120)),
-          ],
-        ),
+            ),
+          );
+        },
       ),
     );
   }

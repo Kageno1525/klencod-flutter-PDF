@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf_text/pdf_text.dart' as ptx;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
@@ -17,6 +18,9 @@ class PdfToolsService {
   PdfToolsService._();
 
   final DatabaseService _db = DatabaseService.instance;
+
+  // جودة عالية للدمج/التقسيم
+  static const int _rasterDpi = 200;
 
   Future<Directory> _pdfsDir() async {
     final appDir = await getApplicationDocumentsDirectory();
@@ -31,6 +35,8 @@ class PdfToolsService {
     return p.join(dir.path, '${ts}_$suffix.$ext');
   }
 
+  // ══════════════════ Share ══════════════════
+
   Future<void> shareFile(String path, String name) async {
     await Share.shareXFiles(
       [XFile(path, name: name)],
@@ -43,6 +49,8 @@ class PdfToolsService {
     final name = p.basename(path);
     await Share.shareXFiles([XFile(path, name: name)], subject: name);
   }
+
+  // ══════════════════ Images → PDF ══════════════════
 
   Future<String> imagesToPdf(List<XFile> images,
       {String baseName = 'images'}) async {
@@ -86,18 +94,20 @@ class PdfToolsService {
         name: p.basename(path), path: path, size: stat.size, groupId: groupId);
   }
 
-  // ─── PDF MERGE & SPLIT ───
+  // ══════════════════ Raster rendering ══════════════════
 
-  Future<List<Uint8List>> renderPdfPages(File file, {int dpi = 130}) async {
+  Future<List<Uint8List>> _renderPages(File file,
+      {int dpi = _rasterDpi}) async {
     final bytes = await file.readAsBytes();
     final images = <Uint8List>[];
     await for (final page in Printing.raster(bytes, dpi: dpi.toDouble())) {
       images.add(await page.toPng());
+      await page.dispose();
     }
     return images;
   }
 
-  Future<File> imagesToSinglePdf(List<Uint8List> pageImages,
+  Future<File> _imagesToSinglePdf(List<Uint8List> pageImages,
       {String baseName = 'output'}) async {
     final doc = pw.Document();
     for (final img in pageImages) {
@@ -117,35 +127,192 @@ class PdfToolsService {
     return File(outPath);
   }
 
+  // ══════════════════ Merge ══════════════════
+
   Future<File> mergePdfs(List<String> paths,
       {String baseName = 'merged'}) async {
     final all = <Uint8List>[];
     for (final path in paths) {
-      final pages = await renderPdfPages(File(path));
+      final pages = await _renderPages(File(path));
       all.addAll(pages);
     }
-    return imagesToSinglePdf(all, baseName: baseName);
+    return _imagesToSinglePdf(all, baseName: baseName);
   }
 
-  Future<File> splitPdf(String sourcePath, List<int> keepPageIndices,
-      {String baseName = 'split'}) async {
-    final all = await renderPdfPages(File(sourcePath));
-    final selected = <Uint8List>[];
-    for (final idx in keepPageIndices) {
-      if (idx >= 0 && idx < all.length) selected.add(all[idx]);
-    }
-    return imagesToSinglePdf(selected, baseName: baseName);
-  }
+  // ══════════════════ Extract range ══════════════════
 
   Future<File> extractRange(String sourcePath, int startPage, int endPage,
       {String baseName = 'extracted'}) async {
-    final all = await renderPdfPages(File(sourcePath));
+    final all = await _renderPages(File(sourcePath));
     final from = (startPage - 1).clamp(0, all.length);
     final to = endPage.clamp(from, all.length);
-    return imagesToSinglePdf(all.sublist(from, to), baseName: baseName);
+    return _imagesToSinglePdf(all.sublist(from, to), baseName: baseName);
   }
 
-  // ─── BACKUP ───
+  // ══════════════════ Delete page ══════════════════
+
+  Future<File> deletePage(String sourcePath, int pageIndex,
+      {String baseName = 'deleted'}) async {
+    final pages = await _renderPages(File(sourcePath));
+    if (pageIndex < 0 || pageIndex >= pages.length) {
+      throw Exception('صفحة غير موجودة');
+    }
+    if (pages.length <= 1) {
+      throw Exception('لا يمكن حذف الصفحة الوحيدة');
+    }
+    pages.removeAt(pageIndex);
+    return _imagesToSinglePdf(pages, baseName: baseName);
+  }
+
+  // ══════════════════ Save page as image ══════════════════
+
+  Future<File> savePageAsImage(String sourcePath, int pageIndex,
+      {int dpi = 300}) async {
+    final pages = await _renderPages(File(sourcePath), dpi: dpi);
+    if (pageIndex < 0 || pageIndex >= pages.length) {
+      throw Exception('صفحة غير موجودة');
+    }
+    final backupDir = await _db.getBackupDirectory();
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final outPath =
+        p.join(backupDir.path, '${ts}_page_${pageIndex + 1}.png');
+    await File(outPath).writeAsBytes(pages[pageIndex]);
+    return File(outPath);
+  }
+
+  // ══════════════════ Watermark ══════════════════
+
+  Future<File> addWatermark(
+    String sourcePath,
+    String watermarkText, {
+    double fontSize = 60,
+    int argbColor = 0x30888888,
+  }) async {
+    final pages = await _renderPages(File(sourcePath));
+
+    pw.Font? font;
+    try {
+      font = await PdfGoogleFonts.cairoRegular();
+    } catch (_) {}
+
+    final doc = pw.Document();
+    for (final img in pages) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.zero,
+          build: (_) => pw.Stack(
+            children: [
+              pw.Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child:
+                    pw.Image(pw.MemoryImage(img), fit: pw.BoxFit.contain),
+              ),
+              pw.Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: pw.Align(
+                  alignment: pw.Alignment.center,
+                  child: pw.Transform.rotate(
+                    angle: -0.5,
+                    child: pw.Text(
+                      watermarkText,
+                      style: pw.TextStyle(
+                        font: font,
+                        fontSize: fontSize,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColor.fromInt(argbColor),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final bytes = await doc.save();
+    final outPath = await _uniquePath('watermarked');
+    await File(outPath).writeAsBytes(bytes);
+    return File(outPath);
+  }
+
+  // ══════════════════ Text Search (pdf_text) ══════════════════
+
+  /// يرجع أرقام الصفحات اللي فيها الكلمة (1-based).
+  /// بيرجع [] لو الـ PDF صورة ممسوحة ضوئيًا.
+  Future<List<int>> searchInPdf(String sourcePath, String query) async {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return [];
+
+    final doc = await ptx.PDFDoc.openFromPath(sourcePath);
+    final hits = <int>[];
+    try {
+      for (int i = 0; i < doc.length; i++) {
+        try {
+          final text = await doc.getText(page: i);
+          if (text.toLowerCase().contains(q)) hits.add(i + 1);
+        } catch (_) {}
+      }
+    } finally {
+      await doc.close();
+    }
+    return hits;
+  }
+
+  Future<String> extractAllText(String sourcePath) async {
+    final doc = await ptx.PDFDoc.openFromPath(sourcePath);
+    final buffer = StringBuffer();
+    try {
+      for (int i = 0; i < doc.length; i++) {
+        try {
+          final text = await doc.getText(page: i);
+          buffer.writeln('— صفحة ${i + 1} —');
+          buffer.writeln(text);
+          buffer.writeln();
+        } catch (e) {
+          buffer.writeln('[خطأ في قراءة الصفحة ${i + 1}]');
+        }
+      }
+    } finally {
+      await doc.close();
+    }
+    return buffer.toString();
+  }
+
+  // ══════════════════ THUMBNAILS ══════════════════
+
+  /// يرجع صورة مصغّرة من الصفحة الأولى. الكاش بيتحفظ في مجلد thumbnails
+  Future<File?> getThumbnail(String pdfPath, {int dpi = 100}) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final thumbsDir = Directory('${appDir.path}/thumbnails');
+      if (!await thumbsDir.exists()) await thumbsDir.create(recursive: true);
+
+      final hash = pdfPath.hashCode.toRadixString(16).replaceAll('-', 'n');
+      final thumbFile = File('${thumbsDir.path}/$hash.png');
+
+      if (await thumbFile.exists()) return thumbFile;
+
+      final bytes = await File(pdfPath).readAsBytes();
+      await for (final page
+          in Printing.raster(bytes, dpi: dpi.toDouble(), pages: const [0])) {
+        final png = await page.toPng();
+        await thumbFile.writeAsBytes(png);
+        await page.dispose();
+        return thumbFile;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // ══════════════════ Backup ══════════════════
 
   Future<File> exportFullBackup() async {
     final backupDir = await _db.getBackupDirectory();
