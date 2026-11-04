@@ -65,6 +65,8 @@ class DatabaseService {
     );
   }
 
+  // ══════════════ Groups (Partitions & Folders) ══════════════
+
   Future<int> insertGroup(String name, {int? parentId}) async {
     final db = await database;
     return db.insert('groups', {
@@ -104,6 +106,23 @@ class DatabaseService {
     final db = await database;
     await db.delete('groups', where: 'id = ?', whereArgs: [id]);
   }
+
+  Future<Map<String, int>> getGroupStats(int groupId) async {
+    final db = await database;
+    final files = await db.query(
+      'files',
+      where: 'group_id = ?',
+      whereArgs: [groupId],
+    );
+    final folders = await db.query(
+      'groups',
+      where: 'parent_id = ?',
+      whereArgs: [groupId],
+    );
+    return {'files': files.length, 'folders': folders.length};
+  }
+
+  // ══════════════ Files ══════════════
 
   Future<int> insertFile({
     required String name,
@@ -233,6 +252,8 @@ class DatabaseService {
       whereArgs: [fileId],
     );
   }
+
+  // ══════════════ Backup ══════════════
 
   Future<Directory> getBackupDirectory() async {
     try {

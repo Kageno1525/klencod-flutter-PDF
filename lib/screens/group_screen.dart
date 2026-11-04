@@ -23,7 +23,6 @@ class _GroupScreenState extends State<GroupScreen> {
   List<Map<String, dynamic>> _files = [];
   bool _isLoading = true;
 
-  // Selection
   final Map<int, Map<String, dynamic>> _selected = {};
   bool get _inSelectionMode => _selected.isNotEmpty;
 
@@ -111,14 +110,18 @@ class _GroupScreenState extends State<GroupScreen> {
     _load();
   }
 
-  Future<void> _createSub() async {
+  Future<void> _createFolder() async {
     final ctrl = TextEditingController();
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('مجموعة فرعية'),
-        content: TextField(controller: ctrl, autofocus: true),
+        title: const Text('مجلد جديد'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'اسم المجلد'),
+        ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
@@ -170,84 +173,132 @@ class _GroupScreenState extends State<GroupScreen> {
         child: SafeArea(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (_groups.isNotEmpty && !_inSelectionMode) ...[
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Text('📁 مجموعات فرعية',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                      ..._groups.map((g) => Padding(
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      if (_groups.isNotEmpty) ...[
+                        Row(
+                          children: [
+                            Icon(Icons.folder_rounded,
+                                color: Colors.amber[700], size: 18),
+                            const SizedBox(width: 6),
+                            const Text('المجلدات',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 14)),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text('${_groups.length}',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                      color: Colors.amber[800])),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ..._groups.map((g) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: GroupTile(
+                                group: g,
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    pageRoute(GroupScreen(
+                                      groupId: g['id'],
+                                      groupName: g['name'],
+                                    )),
+                                  );
+                                  _load();
+                                },
+                                onLongPress: () =>
+                                    _showGroupOptions(g),
+                              ),
+                            )),
+                        const SizedBox(height: 16),
+                      ],
+                      if (_files.isNotEmpty) ...[
+                        Row(
+                          children: [
+                            const Icon(Icons.picture_as_pdf_rounded,
+                                color: Color(0xFFDC2626), size: 18),
+                            const SizedBox(width: 6),
+                            const Text('الملفات',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 14)),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color:
+                                    const Color(0xFFDC2626).withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text('${_files.length}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                      color: Color(0xFFDC2626))),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ..._files.map((f) {
+                          final isSel = _selected.containsKey(f['id']);
+                          return Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: GroupTile(
-                              group: g,
-                              onTap: () async {
-                                await Navigator.push(
-                                  context,
-                                  pageRoute(GroupScreen(
-                                    groupId: g['id'],
-                                    groupName: g['name'],
-                                  )),
-                                );
-                                _load();
+                            child: FileTile(
+                              file: f,
+                              isSelected: isSel,
+                              inSelectionMode: _inSelectionMode,
+                              onTap: () {
+                                if (_inSelectionMode) {
+                                  _toggleSelection(f);
+                                } else {
+                                  _openFile(f);
+                                }
+                              },
+                              onLongPress: () {
+                                if (!_inSelectionMode) {
+                                  _enterSelection(f);
+                                } else {
+                                  _toggleSelection(f);
+                                }
                               },
                             ),
-                          )),
-                      const SizedBox(height: 16),
-                    ],
-                    if (_files.isNotEmpty) ...[
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Text('📄 الملفات',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                      ..._files.map((f) {
-                        final isSel = _selected.containsKey(f['id']);
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: FileTile(
-                            file: f,
-                            isSelected: isSel,
-                            inSelectionMode: _inSelectionMode,
-                            onTap: () {
-                              if (_inSelectionMode) {
-                                _toggleSelection(f);
-                              } else {
-                                _openFile(f);
-                              }
-                            },
-                            onLongPress: () {
-                              if (!_inSelectionMode) {
-                                _enterSelection(f);
-                              } else {
-                                _toggleSelection(f);
-                              }
-                            },
-                          ),
-                        );
-                      }),
-                    ],
-                    if (_groups.isEmpty && _files.isEmpty)
-                      const Center(
-                        child: Padding(
+                          );
+                        }),
+                      ],
+                      if (_groups.isEmpty && _files.isEmpty)
+                        const Padding(
                           padding: EdgeInsets.only(top: 80),
-                          child: Text('هذه المجموعة فارغة',
-                              style: TextStyle(color: Colors.grey)),
+                          child: EmptyState(
+                            icon: Icons.folder_open_rounded,
+                            title: 'هذا القسم فارغ',
+                            subtitle:
+                                'اضغط زر + لإضافة مجلد جديد، أو زر الرفع لإضافة ملفات',
+                            color: Color(0xFFF59E0B),
+                          ),
                         ),
-                      ),
-                  ],
+                      const SizedBox(height: 120),
+                    ],
+                  ),
                 ),
         ),
       ),
       floatingActionButton: _inSelectionMode
           ? null
           : FloatingActionButton(
-              onPressed: _createSub,
-              child: const Icon(Icons.create_new_folder),
+              onPressed: _createFolder,
+              child: const Icon(Icons.create_new_folder_rounded),
             ),
     );
   }
@@ -258,7 +309,10 @@ class _GroupScreenState extends State<GroupScreen> {
       elevation: 0,
       title: Text(widget.groupName),
       actions: [
-        IconButton(icon: const Icon(Icons.upload_file), onPressed: _importPdfs),
+        IconButton(
+            icon: const Icon(Icons.upload_file),
+            onPressed: _importPdfs,
+            tooltip: 'إضافة PDF'),
       ],
     );
   }
@@ -289,6 +343,15 @@ class _GroupScreenState extends State<GroupScreen> {
             onPressed: _batchDelete,
             tooltip: 'حذف'),
       ],
+    );
+  }
+
+  void _showGroupOptions(Map<String, dynamic> g) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => GroupOptionsSheet(group: g, onChanged: _load),
     );
   }
 

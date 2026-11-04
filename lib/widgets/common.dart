@@ -139,7 +139,101 @@ class SectionHeader extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// GROUP TILE
+// PARTITION TILE (القسم)
+// ═══════════════════════════════════════════════════════════════════
+
+class PartitionTile extends StatelessWidget {
+  final Map<String, dynamic> partition;
+  final int foldersCount;
+  final int filesCount;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  const PartitionTile({
+    super.key,
+    required this.partition,
+    required this.foldersCount,
+    required this.filesCount,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        splashColor: Colors.transparent,
+        highlightColor:
+            (isDark ? Colors.white : Colors.black).withOpacity(0.04),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFDC2626), Color(0xFF2563EB)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.library_books_rounded,
+                    color: Colors.white, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      partition['name'],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.folder_rounded,
+                            size: 13, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text('$foldersCount مجلد',
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.grey)),
+                        const SizedBox(width: 10),
+                        Icon(Icons.picture_as_pdf_rounded,
+                            size: 13, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text('$filesCount ملف',
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.grey)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  color: Colors.grey.withOpacity(0.6)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FOLDER TILE (مجلد جوا قسم)
 // ═══════════════════════════════════════════════════════════════════
 
 class GroupTile extends StatelessWidget {
@@ -188,7 +282,7 @@ class GroupTile extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
-          subtitle: const Text('مجموعة',
+          subtitle: const Text('مجلد',
               style: TextStyle(fontSize: 11, color: Colors.grey)),
           trailing: Icon(Icons.chevron_right_rounded,
               color: Colors.grey.withOpacity(0.6)),
@@ -199,7 +293,7 @@ class GroupTile extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// SELECTABLE FILE TILE
+// FILE TILE
 // ═══════════════════════════════════════════════════════════════════
 
 class FileTile extends StatelessWidget {
@@ -249,9 +343,8 @@ class FileTile extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: isSelected
-                ? Border.all(color: primary, width: 1.5)
-                : null,
+            border:
+                isSelected ? Border.all(color: primary, width: 1.5) : null,
           ),
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -328,85 +421,6 @@ class FileTile extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// CATEGORY CHIPS
-// ═══════════════════════════════════════════════════════════════════
-
-class CategoryChips extends StatelessWidget {
-  final String? selected;
-  final ValueChanged<String?> onSelected;
-  const CategoryChips({
-    super.key,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  static const categories = [
-    ('الكل', null),
-    ('فواتير', 'فواتير'),
-    ('كتب وكورسات', 'كتب وكورسات'),
-    ('شهادات', 'شهادات'),
-    ('بحوث', 'بحوث'),
-    ('عام', 'عام'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (ctx, i) {
-          final cat = categories[i];
-          final isSel = selected == cat.$2;
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-          return Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: () => onSelected(cat.$2),
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSel
-                      ? Theme.of(context).colorScheme.primary.withOpacity(0.15)
-                      : (isDark ? const Color(0xFF1A1A2E) : Colors.white),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: isSel
-                        ? Theme.of(context).colorScheme.primary
-                        : (isDark
-                            ? Colors.white.withOpacity(0.08)
-                            : Colors.black.withOpacity(0.06)),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  cat.$1,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: isSel
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
       ),
     );
   }
@@ -521,9 +535,9 @@ class AddMenuSheet extends StatelessWidget {
               _opt(Icons.camera_alt_rounded,
                   const [Color(0xFFF59E0B), Color(0xFFEF4444)],
                   'مسح بالكاميرا', onCamera),
-              _opt(Icons.create_new_folder_rounded,
-                  const [Color(0xFFFBBF24), Color(0xFFF59E0B)],
-                  'مجموعة جديدة', onGroup),
+              _opt(Icons.library_books_rounded,
+                  const [Color(0xFFDC2626), Color(0xFF2563EB)],
+                  'قسم جديد', onGroup),
             ],
           ),
         ),
@@ -660,10 +674,9 @@ class FileOptionsSheet extends StatelessWidget {
                 }
               }),
               _opt(Icons.drive_file_move_rounded, Colors.orange,
-                  'نقل إلى مجموعة...', () async {
+                  'نقل إلى...', () async {
                 Navigator.pop(context);
-                final target = await pickGroup(context,
-                    title: 'نقل إلى...');
+                final target = await pickGroup(context, title: 'نقل إلى...');
                 if (target == null) return;
                 final gid = target == -1 ? null : target;
                 await db.moveFile(file['id'], gid);
@@ -880,9 +893,8 @@ class GroupOptionsSheet extends StatelessWidget {
                     ),
                   );
                   if (n != null && n.isNotEmpty) {
-                    final raw = await DatabaseService.instance.database;
-                    await raw.update('groups', {'name': n},
-                        where: 'id = ?', whereArgs: [group['id']]);
+                    await DatabaseService.instance.updateGroup(
+                        group['id'] as int, n);
                     onChanged();
                   }
                 },
@@ -891,7 +903,7 @@ class GroupOptionsSheet extends StatelessWidget {
                 dense: true,
                 leading: const Icon(Icons.delete_rounded,
                     color: Colors.red, size: 22),
-                title: const Text('حذف المجموعة',
+                title: const Text('حذف',
                     style:
                         TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 onTap: () async {
@@ -901,8 +913,8 @@ class GroupOptionsSheet extends StatelessWidget {
                     builder: (ctx) => AlertDialog(
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24)),
-                      title: const Text('حذف المجموعة؟'),
-                      content: const Text('سيتم حذف كل ما بداخلها.'),
+                      title: const Text('حذف؟'),
+                      content: const Text('سيتم حذف كل ما بداخله.'),
                       actions: [
                         TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
@@ -1018,19 +1030,17 @@ class FileInfoSheet extends StatelessWidget {
                         file['last_opened_at']),
                   ),
                 ),
-              _row(context, 'التصنيف', file['auto_category'] ?? 'عام'),
               if (file['tag_color'] != null)
-                _row(context, 'الوسم',
-                    file['tag_label'] ?? 'وسم ملون',
+                _row(context, 'الوسم', file['tag_label'] ?? 'وسم ملون',
                     color: Color(file['tag_color'])),
               FutureBuilder<Map<String, dynamic>?>(
                 future: file['group_id'] != null
                     ? db.getGroupById(file['group_id'] as int)
                     : Future.value(null),
                 builder: (ctx, snap) {
-                  final groupName =
-                      snap.data?['name'] ?? (file['group_id'] == null ? 'الجذر' : '...');
-                  return _row(context, 'المجموعة', groupName);
+                  final groupName = snap.data?['name'] ??
+                      (file['group_id'] == null ? 'غير محدد' : '...');
+                  return _row(context, 'المجلد', groupName);
                 },
               ),
               const Divider(height: 20),
@@ -1045,8 +1055,7 @@ class FileInfoSheet extends StatelessWidget {
                             ClipboardData(text: file['path']));
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('تم نسخ المسار')),
+                            const SnackBar(content: Text('تم نسخ المسار')),
                           );
                         }
                       },
@@ -1112,7 +1121,7 @@ class FileInfoSheet extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// GROUP PICKER
+// PICKERS
 // ═══════════════════════════════════════════════════════════════════
 
 /// Returns `-1` for root, `id` for a group, `null` if user cancelled.
@@ -1138,19 +1147,18 @@ Future<int?> pickGroup(BuildContext context,
   walk(null, 0);
 
   if (!context.mounted) return null;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
   return showDialog<int>(
     context: context,
     builder: (ctx) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: Text(title ?? 'اختر المجموعة'),
+      title: Text(title ?? 'اختر المكان'),
       content: SizedBox(
         width: double.maxFinite,
         child: flat.isEmpty
             ? const Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'لا توجد مجموعات بعد.\nسيتم الحفظ في الجذر.',
+                  'لا توجد أقسام بعد.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
@@ -1164,9 +1172,9 @@ Future<int?> pickGroup(BuildContext context,
                               left: 12.0 + e.value * 20.0, right: 12),
                           leading: Icon(
                             e.value == 0
-                                ? Icons.folder_rounded
-                                : Icons.subdirectory_arrow_right_rounded,
-                            color: Colors.amber,
+                                ? Icons.library_books_rounded
+                                : Icons.folder_rounded,
+                            color: e.value == 0 ? Colors.red : Colors.amber,
                             size: 20,
                           ),
                           title: Text(
@@ -1185,7 +1193,7 @@ Future<int?> pickGroup(BuildContext context,
           FilledButton.icon(
             onPressed: () => Navigator.pop(ctx, -1),
             icon: const Icon(Icons.home_rounded, size: 18),
-            label: const Text('الجذر'),
+            label: const Text('بدون مجلد'),
           ),
         TextButton(
             onPressed: () => Navigator.pop(ctx, null),
@@ -1194,10 +1202,6 @@ Future<int?> pickGroup(BuildContext context,
     ),
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// TAG COLOR PICKER
-// ═══════════════════════════════════════════════════════════════════
 
 Future<Color?> pickTagColor(BuildContext context) async {
   const colors = [

@@ -8,7 +8,7 @@ import '../services/database_service.dart';
 import '../services/pdf_tools_service.dart';
 import '../widgets/common.dart';
 import 'favorites_screen.dart';
-import 'group_screen.dart';
+import 'groups_screen.dart';
 import 'pdf_viewer_screen.dart';
 import 'recent_screen.dart';
 import 'settings_screen.dart';
@@ -27,15 +27,13 @@ class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
   int _refreshTick = 0;
 
-  // Selection state
   final Map<int, Map<String, dynamic>> _selectedFiles = {};
   bool get _inSelectionMode => _selectedFiles.isNotEmpty;
 
-  // Files loaded in current tab (for "select all")
   List<Map<String, dynamic>> _currentTabFiles = [];
 
   static const _titles = [
-    'مستودع PDF',
+    'كل الملفات',
     'المفضلة',
     'الأخيرة',
     'الأدوات',
@@ -75,9 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _enterSelection(Map<String, dynamic> f) {
-    setState(() {
-      _selectedFiles[f['id'] as int] = f;
-    });
+    setState(() => _selectedFiles[f['id'] as int] = f);
   }
 
   void _clearSelection() => setState(() => _selectedFiles.clear());
@@ -152,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _bumpRefresh();
   }
 
-  // ────── Normal AppBar ──────
+  // ────── AppBars ──────
   PreferredSizeWidget _buildNormalAppBar() {
     final tp = context.watch<ThemeProvider>();
     return AppBar(
@@ -174,7 +170,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ────── Selection AppBar ──────
   PreferredSizeWidget _buildSelectionAppBar() {
     final primary = Theme.of(context).colorScheme.primary;
     return AppBar(
@@ -276,9 +271,9 @@ class _HomeScreenState extends State<HomeScreen> {
               onDestinationSelected: _onTabSelected,
               destinations: const [
                 NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home_rounded),
-                  label: 'الرئيسية',
+                  icon: Icon(Icons.picture_as_pdf_outlined),
+                  selectedIcon: Icon(Icons.picture_as_pdf_rounded),
+                  label: 'الملفات',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.star_outline_rounded),
@@ -381,7 +376,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+            _drawerItem(Icons.library_books_rounded, 'المجموعات', () {
+              Navigator.pop(context);
+              _openGroups();
+            }, highlight: true),
+            const Divider(height: 8, indent: 16, endIndent: 16),
             _drawerItem(Icons.upload_file_rounded, 'استيراد PDF سريع', () {
               Navigator.pop(context);
               _importPdfs();
@@ -420,22 +420,40 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _drawerItem(IconData icon, String label, VoidCallback onTap) {
+  Widget _drawerItem(IconData icon, String label, VoidCallback onTap,
+      {bool highlight = false}) {
     final primary = Theme.of(context).colorScheme.primary;
     return ListTile(
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: primary.withOpacity(0.12),
+          gradient: highlight
+              ? const LinearGradient(
+                  colors: [Color(0xFFDC2626), Color(0xFF2563EB)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: highlight ? null : primary.withOpacity(0.12),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: primary, size: 20),
+        child: Icon(icon, color: highlight ? Colors.white : primary, size: 20),
       ),
       title: Text(label,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          style: TextStyle(
+              fontWeight: highlight ? FontWeight.bold : FontWeight.w600,
+              fontSize: 14)),
+      trailing: highlight
+          ? Icon(Icons.chevron_right_rounded, color: primary, size: 20)
+          : null,
       onTap: onTap,
     );
+  }
+
+  void _openGroups() async {
+    await Navigator.push(context, pageRoute(const GroupsScreen()));
+    _bumpRefresh();
   }
 
   Future<void> _showAddMenu() async {
@@ -458,10 +476,48 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         onGroup: () {
           Navigator.pop(context);
-          _createGroup();
+          _createPartition();
         },
       ),
     );
+  }
+
+  Future<void> _createPartition() async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('قسم جديد'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'اسم القسم'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('إنشاء'),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty) {
+      await _db.insertGroup(name);
+      _bumpRefresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تم إنشاء القسم "$name"'),
+          action: SnackBarAction(
+            label: 'اذهب',
+            onPressed: _openGroups,
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _importPdfs({int? presetGroupId}) async {
@@ -476,7 +532,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (presetGroupId == null) {
       if (!mounted) return;
       final target = await pickGroup(context, title: 'أين تحفظ الملفات؟');
-      if (target == null) return; // cancelled
+      if (target == null) return;
       groupId = target == -1 ? null : target;
     }
 
@@ -539,34 +595,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('خطأ: $e')));
-    }
-  }
-
-  Future<void> _createGroup() async {
-    final ctrl = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('مجموعة جديدة'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'اسم المجموعة'),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('إنشاء'),
-          ),
-        ],
-      ),
-    );
-    if (name != null && name.isNotEmpty) {
-      await _db.insertGroup(name);
-      _bumpRefresh();
     }
   }
 
@@ -664,7 +692,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Text('الإصدار: 1.0.0', style: TextStyle(fontSize: 13)),
             SizedBox(height: 8),
             Text(
-              'مستودعك الشخصي لملفات PDF\nمع مجموعات متداخلة، بحث، وأدوات احترافية.',
+              'مستودعك الشخصي لملفات PDF\nمع أقسام ومجلدات متداخلة، بحث، وأدوات احترافية.',
               style: TextStyle(fontSize: 13, color: Colors.grey),
             ),
           ],
@@ -681,7 +709,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// HOME TAB
+// HOME TAB (الملفات فقط)
 // ═══════════════════════════════════════════════════════════════════
 
 class HomeTab extends StatefulWidget {
@@ -708,11 +736,9 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   final _db = DatabaseService.instance;
-  List<Map<String, dynamic>> _groups = [];
   List<Map<String, dynamic>> _files = [];
   bool _loading = true;
   String _sortBy = 'added_at DESC';
-  String? _category;
   final _searchCtrl = TextEditingController();
   String _search = '';
 
@@ -732,13 +758,11 @@ class _HomeTabState extends State<HomeTab> {
 
   Future<void> _load() async {
     if (mounted) setState(() => _loading = true);
-    final groups = await _db.getGroups(parentId: null);
     final files = _search.isEmpty
-        ? await _db.getFiles(sortBy: _sortBy, autoCategory: _category)
+        ? await _db.getFiles(allGroups: true, sortBy: _sortBy)
         : await _db.searchFiles(_search);
     if (!mounted) return;
     setState(() {
-      _groups = groups;
       _files = files;
       _loading = false;
     });
@@ -756,50 +780,12 @@ class _HomeTabState extends State<HomeTab> {
           ),
           slivers: [
             SliverToBoxAdapter(child: _buildSearch()),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: CategoryChips(
-                  selected: _category,
-                  onSelected: (c) {
-                    setState(() => _category = c);
-                    _load();
-                  },
-                ),
-              ),
-            ),
             SliverToBoxAdapter(child: _buildSortChips()),
-            if (_groups.isNotEmpty && !_inSelectionMode) ...[
-              SliverToBoxAdapter(
-                child: SectionHeader(
-                  icon: Icons.folder_rounded,
-                  title: 'المجموعات',
-                  color: Colors.amber,
-                  trailing: '${_groups.length}',
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverList.builder(
-                  itemCount: _groups.length,
-                  itemBuilder: (ctx, i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: RepaintBoundary(
-                      child: GroupTile(
-                        group: _groups[i],
-                        onTap: () => _openGroup(_groups[i]),
-                        onLongPress: () => _openGroupOptions(_groups[i]),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
             if (_files.isNotEmpty) ...[
               SliverToBoxAdapter(
                 child: SectionHeader(
                   icon: Icons.picture_as_pdf_rounded,
-                  title: _search.isEmpty ? 'الملفات' : 'نتائج البحث',
+                  title: _search.isEmpty ? 'كل الملفات' : 'نتائج البحث',
                   color: const Color(0xFFDC2626),
                   trailing: '${_files.length}',
                 ),
@@ -810,8 +796,7 @@ class _HomeTabState extends State<HomeTab> {
                   itemCount: _files.length,
                   itemBuilder: (ctx, i) {
                     final f = _files[i];
-                    final isSel =
-                        widget.selectedFiles.containsKey(f['id']);
+                    final isSel = widget.selectedFiles.containsKey(f['id']);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: RepaintBoundary(
@@ -847,14 +832,15 @@ class _HomeTabState extends State<HomeTab> {
                   child: Center(child: CircularProgressIndicator()),
                 ),
               ),
-            if (!_loading && _groups.isEmpty && _files.isEmpty)
+            if (!_loading && _files.isEmpty)
               SliverToBoxAdapter(
                 child: EmptyState(
-                  icon: Icons.folder_open_rounded,
+                  icon: Icons.picture_as_pdf_outlined,
                   title: _search.isEmpty ? 'لا توجد ملفات بعد' : 'لا توجد نتائج',
                   subtitle: _search.isEmpty
-                      ? 'اضغط زر + لإضافة ملف أو مجموعة'
+                      ? 'اضغط زر + لاستيراد ملف PDF'
                       : 'جرّب كلمة بحث أخرى',
+                  color: const Color(0xFFDC2626),
                 ),
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 120)),
@@ -882,7 +868,7 @@ class _HomeTabState extends State<HomeTab> {
         child: TextField(
           controller: _searchCtrl,
           decoration: InputDecoration(
-            hintText: 'ابحث عن ملف...',
+            hintText: 'ابحث في كل الملفات...',
             prefixIcon: const Icon(Icons.search_rounded, size: 22),
             suffixIcon: _search.isNotEmpty
                 ? IconButton(
@@ -977,14 +963,6 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  void _openGroup(Map<String, dynamic> g) async {
-    await Navigator.push(
-      context,
-      pageRoute(GroupScreen(groupId: g['id'], groupName: g['name'])),
-    );
-    widget.onChanged();
-  }
-
   Future<void> _openFile(Map<String, dynamic> f) async {
     await _db.markOpened(f['id']);
     if (!mounted) return;
@@ -993,23 +971,5 @@ class _HomeTabState extends State<HomeTab> {
       pageRoute(PdfViewerScreen(filePath: f['path'], fileName: f['name'])),
     );
     widget.onChanged();
-  }
-
-  void _openFileOptions(Map<String, dynamic> f) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => FileOptionsSheet(file: f, onChanged: widget.onChanged),
-    );
-  }
-
-  void _openGroupOptions(Map<String, dynamic> g) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => GroupOptionsSheet(group: g, onChanged: widget.onChanged),
-    );
   }
 }
